@@ -1,6 +1,6 @@
-/*!************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[11].oneOf[2].use[1]!./node_modules/next/dist/build/webpack/loaders/next-font-loader/index.js??ruleSet[1].rules[11].oneOf[2].use[2]!./node_modules/next/font/google/target.css?{"path":"src\\app\\layout.tsx","import":"Inter","arguments":[{"subsets":["latin"],"variable":"--font-inter"}],"variableName":"inter"} ***!
-  \************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[11].oneOf[2].use[1]!./node_modules/next/dist/build/webpack/loaders/next-font-loader/index.js??ruleSet[1].rules[11].oneOf[2].use[2]!./node_modules/next/font/google/target.css?{"path":"app\\layout.tsx","import":"Inter","arguments":[{"subsets":["latin"],"variable":"--font-inter"}],"variableName":"inter"} ***!
+  \*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /* cyrillic-ext */
 @font-face {
   font-family: '__Inter_d65c78';
@@ -572,19 +572,24 @@ video {
 [hidden]:where(:not([hidden="until-found"])) {
   display: none;
 }
+    /* CSS variables can still be useful for other non-Tailwind specific things if needed */
+    /* For example, if you had JS needing to access these, or for non-Tailwind styled components */
      :root {
-        --background: #303036;
-        --foreground: #FEFFFE;
+        --accent-red-value: #F2542D;
+        /* Example if needed elsewhere */
+        --accent-blue-value: #2081C3;
+        --accent-green-value: #669D31;
     }
     body {
-  --tw-bg-opacity: 1;
-  background-color: rgb(48 48 54 / var(--tw-bg-opacity, 1));
-  font-family: Inter, sans-serif;
-  --tw-text-opacity: 1;
-  color: rgb(254 255 254 / var(--tw-text-opacity, 1));
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+        /* These will now correctly use the colors defined in tailwind.config.ts */
+        --tw-bg-opacity: 1;
+        background-color: rgb(48 48 54 / var(--tw-bg-opacity, 1));
+        font-family: Inter, sans-serif;
+        --tw-text-opacity: 1;
+        color: rgb(254 255 254 / var(--tw-text-opacity, 1));
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
 .container {
   width: 100%;
 }
@@ -618,6 +623,8 @@ video {
     max-width: 1536px;
   }
 }
+/* These classes use direct color values, which is fine */
+/* Alternatively, they could use @apply text-accent-red, etc., if you prefer consistency */
 .accent-red {
         color: #F2542D;
     }
@@ -638,8 +645,20 @@ video {
   white-space: nowrap;
   border-width: 0;
 }
+.pointer-events-none {
+  pointer-events: none;
+}
+.pointer-events-auto {
+  pointer-events: auto;
+}
+.visible {
+  visibility: visible;
+}
 .fixed {
   position: fixed;
+}
+.absolute {
+  position: absolute;
 }
 .relative {
   position: relative;
@@ -651,8 +670,20 @@ video {
   left: 0px;
   right: 0px;
 }
+.left-0 {
+  left: 0px;
+}
+.left-1\/2 {
+  left: 50%;
+}
 .top-0 {
   top: 0px;
+}
+.top-1\/2 {
+  top: 50%;
+}
+.z-0 {
+  z-index: 0;
 }
 .z-10 {
   z-index: 10;
@@ -660,20 +691,18 @@ video {
 .z-50 {
   z-index: 50;
 }
-.mb-4 {
-  margin-bottom: 1rem;
+.z-\[100\] {
+  z-index: 100;
 }
-.mb-8 {
-  margin-bottom: 2rem;
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
 }
-.ml-2 {
-  margin-left: 0.5rem;
+.mt-4 {
+  margin-top: 1rem;
 }
-.mr-1 {
-  margin-right: 0.25rem;
-}
-.inline-block {
-  display: inline-block;
+.mt-32 {
+  margin-top: 8rem;
 }
 .flex {
   display: flex;
@@ -684,11 +713,11 @@ video {
 .hidden {
   display: none;
 }
-.h-5 {
-  height: 1.25rem;
-}
 .h-6 {
   height: 1.5rem;
+}
+.h-\[200vh\] {
+  height: 200vh;
 }
 .h-full {
   height: 100%;
@@ -696,11 +725,11 @@ video {
 .h-screen {
   height: 100vh;
 }
+.h-\[250vh\] {
+  height: 250vh;
+}
 .min-h-screen {
   min-height: 100vh;
-}
-.w-5 {
-  width: 1.25rem;
 }
 .w-6 {
   width: 1.5rem;
@@ -708,8 +737,30 @@ video {
 .w-full {
   width: 100%;
 }
-.max-w-xl {
-  max-width: 36rem;
+.max-w-xs {
+  max-width: 20rem;
+}
+.max-w-2xl {
+  max-width: 42rem;
+}
+.flex-grow {
+  flex-grow: 1;
+}
+.grow {
+  flex-grow: 1;
+}
+.-translate-x-1\/2 {
+  --tw-translate-x: -50%;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+.-translate-y-1\/2 {
+  --tw-translate-y: -50%;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+.select-none {
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
 }
 .flex-col {
   flex-direction: column;
@@ -723,9 +774,6 @@ video {
 .justify-between {
   justify-content: space-between;
 }
-.gap-2 {
-  gap: 0.5rem;
-}
 .gap-4 {
   gap: 1rem;
 }
@@ -735,11 +783,8 @@ video {
 .gap-8 {
   gap: 2rem;
 }
-.overflow-hidden {
-  overflow: hidden;
-}
-.rounded-full {
-  border-radius: 9999px;
+.overflow-x-hidden {
+  overflow-x: hidden;
 }
 .rounded-lg {
   border-radius: 0.5rem;
@@ -747,15 +792,8 @@ video {
 .rounded-md {
   border-radius: 0.375rem;
 }
-.border {
-  border-width: 1px;
-}
 .border-b {
   border-bottom-width: 1px;
-}
-.border-foreground {
-  --tw-border-opacity: 1;
-  border-color: rgb(254 255 254 / var(--tw-border-opacity, 1));
 }
 .border-white\/10 {
   border-color: rgb(254 255 254 / 0.1);
@@ -767,13 +805,17 @@ video {
   --tw-bg-opacity: 1;
   background-color: rgb(32 129 195 / var(--tw-bg-opacity, 1));
 }
-.bg-accent-red {
-  --tw-bg-opacity: 1;
-  background-color: rgb(242 84 45 / var(--tw-bg-opacity, 1));
-}
 .bg-background {
   --tw-bg-opacity: 1;
   background-color: rgb(48 48 54 / var(--tw-bg-opacity, 1));
+}
+.bg-black {
+  --tw-bg-opacity: 1;
+  background-color: rgb(48 48 54 / var(--tw-bg-opacity, 1));
+}
+.object-cover {
+  -o-object-fit: cover;
+     object-fit: cover;
 }
 .p-2 {
   padding: 0.5rem;
@@ -809,19 +851,28 @@ video {
 .pt-20 {
   padding-top: 5rem;
 }
+.pt-4 {
+  padding-top: 1rem;
+}
 .text-center {
   text-align: center;
+}
+.font-logo {
+  font-family: Bungee, sans-serif;
 }
 .font-sans {
   font-family: Inter, sans-serif;
 }
-.text-4xl {
-  font-size: 2.25rem;
-  line-height: 2.5rem;
+.text-5xl {
+  font-size: 3rem;
+  line-height: 1;
 }
 .text-lg {
   font-size: 1.125rem;
   line-height: 1.75rem;
+}
+.font-bold {
+  font-weight: 700;
 }
 .font-extrabold {
   font-weight: 800;
@@ -892,11 +943,6 @@ video {
   background-color: rgb(75 85 99 / var(--tw-bg-opacity, 1));
 }
 
-.hover\:bg-accent-blue:hover {
-  --tw-bg-opacity: 1;
-  background-color: rgb(32 129 195 / var(--tw-bg-opacity, 1));
-}
-
 .hover\:bg-accent-blue\/10:hover {
   background-color: rgb(32 129 195 / 0.1);
 }
@@ -911,12 +957,19 @@ video {
   color: rgb(32 129 195 / var(--tw-text-opacity, 1));
 }
 
-.hover\:text-white:hover {
-  --tw-text-opacity: 1;
-  color: rgb(254 255 254 / var(--tw-text-opacity, 1));
+@media (min-width: 640px) {
+
+  .sm\:px-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
 }
 
 @media (min-width: 768px) {
+
+  .md\:mt-40 {
+    margin-top: 10rem;
+  }
 
   .md\:flex {
     display: flex;
@@ -926,13 +979,25 @@ video {
     display: none;
   }
 
-  .md\:text-6xl {
-    font-size: 3.75rem;
+  .md\:max-w-3xl {
+    max-width: 48rem;
+  }
+
+  .md\:text-7xl {
+    font-size: 4.5rem;
     line-height: 1;
   }
 
-  .md\:text-xl {
-    font-size: 1.25rem;
-    line-height: 1.75rem;
+  .md\:text-2xl {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+
+  .lg\:px-8 {
+    padding-left: 2rem;
+    padding-right: 2rem;
   }
 }

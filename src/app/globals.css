@@ -2,16 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 @layer base {
+    /* CSS variables can still be useful for other non-Tailwind specific things if needed */
+    /* For example, if you had JS needing to access these, or for non-Tailwind styled components */
      :root {
-        --background: #303036;
-        --foreground: #FEFFFE;
+        --accent-red-value: #F2542D;
+        /* Example if needed elsewhere */
+        --accent-blue-value: #2081C3;
+        --accent-green-value: #669D31;
     }
     body {
+        /* These will now correctly use the colors defined in tailwind.config.ts */
         @apply antialiased bg-background text-foreground font-sans;
     }
 }
 
 @layer components {
+    /* These classes use direct color values, which is fine */
+    /* Alternatively, they could use @apply text-accent-red, etc., if you prefer consistency */
     .accent-red {
         color: #F2542D;
     }
