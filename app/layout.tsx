@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import '@/app/globals.css'; // Corrected path assuming src is aliased or directly accessible
-// import Navigation from '@/components/Navigation'; // Temporarily commented out for initial full-screen hero
 import { AuthProvider } from '@/lib/auth-context'; // Assuming lib/auth-context.tsx
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -31,9 +30,7 @@ export default function RootLayout({
       {/* Ensure bg-background, text-foreground, and font-sans are defined in globals.css / tailwind config */}
       <body className="min-h-screen bg-background text-foreground font-sans">
         <AuthProvider>
-          {/* <Navigation /> */}
-          {/* <div className="pt-20">{children}</div> */}
-          {children} {/* Children directly rendered without padding for now */}
+          {children}
         </AuthProvider>
       </body>
     </html>

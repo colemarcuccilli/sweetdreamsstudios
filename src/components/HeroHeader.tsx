@@ -14,23 +14,22 @@ const LOGO_FINAL_HEIGHT = 40;
 const LOGO_INITIAL_WIDTH = 900;
 const LOGO_INITIAL_HEIGHT = 150;
 const PARAGRAPH_THRESHOLD = 120; // px below snapped point
+const HIDE_HEADER_THRESHOLD = 0.6; // Lowered for faster disappear
 
 const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
   const [isSnapped, setIsSnapped] = useState(false);
   const [showParagraph, setShowParagraph] = useState(false);
+  const [hideHeaderContent, setHideHeaderContent] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const hasTriggeredShow = useRef(false);
 
   useEffect(() => {
     // Only run on client
     setHydrated(true);
-    // Set initial snapped state based on scroll position
-    if (window.scrollY > 0) {
-      setIsSnapped(true);
-      onNavShouldShow();
-      hasTriggeredShow.current = true;
-    }
+    // Only snap if user scrolls (not on load)
     const handleScroll = () => {
+      const headerHeight = window.innerHeight * 2.5; // h-[250vh]
+      const scrollPercent = window.scrollY / headerHeight;
       if (window.scrollY > 0 && !isSnapped) {
         setIsSnapped(true);
         if (!hasTriggeredShow.current) {
@@ -47,6 +46,12 @@ const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
         setShowParagraph(true);
       } else {
         setShowParagraph(false);
+      }
+      // Hide all header content before portfolio section
+      if (scrollPercent > HIDE_HEADER_THRESHOLD) {
+        setHideHeaderContent(true);
+      } else {
+        setHideHeaderContent(false);
       }
     };
     window.addEventListener('scroll', handleScroll);
@@ -88,8 +93,8 @@ const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
       transition: { duration: 0.3, ease: 'easeInOut' },
     },
     snapped: {
-      y: '-10vh',
-      opacity: 1,
+      y: hideHeaderContent ? '-30vh' : '-10vh',
+      opacity: hideHeaderContent ? 0 : 1,
       transition: { duration: 0.3, ease: 'easeInOut' },
     },
   };
@@ -100,8 +105,8 @@ const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
       transition: { duration: 0.3, ease: 'easeInOut' },
     },
     visible: {
-      opacity: 1,
-      y: 0,
+      opacity: hideHeaderContent ? 0 : 1,
+      y: hideHeaderContent ? -40 : 0,
       transition: { duration: 0.3, ease: 'easeInOut' },
     },
   };
@@ -163,7 +168,7 @@ const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
           />
         </motion.div>
       )}
-      {/* Animated headline - snaps up instantly */}
+      {/* Animated headline - snaps up instantly, then fades/slides out */}
       {hydrated && isSnapped && (
         <motion.div
           variants={headlineVariants}
@@ -175,13 +180,13 @@ const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
           </h1>
         </motion.div>
       )}
-      {/* Animated paragraph - appears below headline on second scroll */}
+      {/* Animated paragraph and arrow - fade/slide out with header content */}
       {hydrated && isSnapped && (
         <motion.div
           variants={paragraphVariants}
           initial="hidden"
           animate={showParagraph ? 'visible' : 'hidden'}
-          className="fixed top-0 left-0 w-full h-screen flex justify-center items-center z-10 pointer-events-none"
+          className="fixed top-0 left-0 w-full h-screen flex flex-col items-center justify-center z-10 pointer-events-none"
           style={{ pointerEvents: 'none' }}
         >
           <p
@@ -190,6 +195,27 @@ const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
           >
             Use the navigation at the top to discover our professional studio, videography services, and our innovative AI-powered artist development platform. Dive deeper into what we offer every client and the exclusive features for developing artists. Scroll down to learn about our unique approach and see how we can help you create and grow.
           </p>
+          {/* Pulsing arrow button only visible if paragraph is visible and header content is not hidden */}
+          {showParagraph && !hideHeaderContent && (
+            <motion.button
+              type="button"
+              className="mt-8 w-14 h-14 flex items-center justify-center rounded-full bg-accent-blue text-white shadow-lg animate-pulse focus:outline-none focus:ring-4 focus:ring-accent-blue/40 pointer-events-auto"
+              whileHover={{ scale: 1.12 }}
+              whileTap={{ scale: 0.97 }}
+              aria-label="Scroll to portfolio"
+              onClick={() => {
+                const el = document.getElementById('portfolio-section');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+            >
+              {/* Down arrow SVG */}
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </motion.button>
+          )}
         </motion.div>
       )}
     </section>
