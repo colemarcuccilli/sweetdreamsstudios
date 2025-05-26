@@ -38,6 +38,23 @@ export default function PortfolioSection({ onEndInView }: PortfolioSectionProps)
   const [hoveredProject, setHoveredProject] = useState<typeof projects[0] | null>(null);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
   const endRef = useRef<HTMLDivElement>(null);
+  const [numCols, setNumCols] = useState(3);
+
+  // Reset scroll position on mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    
+    // Set initial column count
+    const handleResize = () => {
+      if (window.innerWidth < 768) setNumCols(1);
+      else if (window.innerWidth < 1024) setNumCols(2);
+      else setNumCols(3);
+    };
+    
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Helper to split projects into columns
   function splitIntoColumns<T>(arr: T[], numCols: number): T[][] {
@@ -48,12 +65,6 @@ export default function PortfolioSection({ onEndInView }: PortfolioSectionProps)
     return cols;
   }
 
-  // Responsive column count
-  let numCols = 3;
-  if (typeof window !== 'undefined') {
-    if (window.innerWidth < 768) numCols = 1;
-    else if (window.innerWidth < 1024) numCols = 2;
-  }
   const columns: Array<typeof projects[number]>[] = splitIntoColumns(projects, numCols);
 
   const handleThumbnailClick = (project: typeof projects[0]) => {
@@ -80,8 +91,7 @@ export default function PortfolioSection({ onEndInView }: PortfolioSectionProps)
     <section
       id="portfolio-section"
       ref={sectionRef}
-      className="sticky top-0 w-full min-h-screen bg-background py-24 flex flex-col items-center z-30"
-      style={{ height: '100vh' }}
+      className="relative w-full min-h-screen bg-background py-24 flex flex-col items-center z-30 overflow-hidden"
     >
       {/* Animated phrase */}
       <motion.h2
@@ -89,12 +99,12 @@ export default function PortfolioSection({ onEndInView }: PortfolioSectionProps)
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: 'easeOut' }}
         viewport={{ once: true }}
-        className="text-4xl md:text-6xl font-bold font-logo text-center mb-16 text-white drop-shadow-lg"
+        className="text-4xl md:text-6xl font-bold font-inter text-center mb-16 text-white drop-shadow-lg"
       >
         Witness the Vision.
       </motion.h2>
       {/* Folded Thumbnails Masonry Columns */}
-      <div className="w-full max-w-6xl flex flex-row gap-4 justify-center">
+      <div className="w-full px-4 flex flex-row gap-4 justify-center overflow-hidden">
         {columns.map((col, colIdx) => (
           <div key={colIdx} className="flex flex-col gap-4 flex-1 min-w-0">
             {col.map((project, idx) => {
