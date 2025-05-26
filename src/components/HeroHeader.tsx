@@ -9,12 +9,13 @@ interface HeroHeaderProps {
   onNavShouldHide: () => void;
 }
 
-const LOGO_FINAL_WIDTH = 120; // Slightly smaller for a perfect fit
+// Adjusted initial logo size (15% smaller)
+const LOGO_INITIAL_WIDTH = 765; // Reduced from 900
+const LOGO_INITIAL_HEIGHT = 127; // Reduced from 150
+const LOGO_FINAL_WIDTH = 120;
 const LOGO_FINAL_HEIGHT = 40;
-const LOGO_INITIAL_WIDTH = 900;
-const LOGO_INITIAL_HEIGHT = 150;
-const PARAGRAPH_THRESHOLD = 120; // px below snapped point
-const HIDE_HEADER_THRESHOLD = 0.6; // Lowered for faster disappear
+const PARAGRAPH_THRESHOLD = 120;
+const HIDE_HEADER_THRESHOLD = 0.6;
 
 const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
   const [isSnapped, setIsSnapped] = useState(false);
@@ -59,7 +60,7 @@ const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
     // eslint-disable-next-line
   }, []); // Only run once on mount
 
-  // Framer Motion variants for snap states
+  // Updated logo variants with higher final position
   const logoVariants = {
     initial: {
       scale: 1,
@@ -69,23 +70,12 @@ const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
     },
     snapped: {
       scale: LOGO_FINAL_WIDTH / LOGO_INITIAL_WIDTH,
-      y: '-6vh',
+      y: '-20vh', // Increased from -6vh to move logo higher
       opacity: 0,
       transition: { duration: 0.3, ease: 'easeInOut' },
     },
   };
-  const ovalVariants = {
-    initial: {
-      opacity: 0,
-      y: '-6vh',
-      transition: { duration: 0.3, ease: 'easeInOut' },
-    },
-    snapped: {
-      opacity: 1,
-      y: '-6vh',
-      transition: { duration: 0.3, ease: 'easeInOut' },
-    },
-  };
+
   const headlineVariants = {
     initial: {
       y: '40vh',
@@ -98,6 +88,7 @@ const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
       transition: { duration: 0.3, ease: 'easeInOut' },
     },
   };
+
   const paragraphVariants = {
     hidden: {
       opacity: 0,
@@ -143,31 +134,14 @@ const HeroHeader = ({ onNavShouldShow, onNavShouldHide }: HeroHeaderProps) => {
         className="fixed top-0 left-0 w-full flex justify-center pt-4 z-10 pointer-events-none"
       >
         <Image
-          src="/images/logos/SDWhiteOutlineLogoWide.svg"
+          src="/images/logos/SDOutlineShadowLogoWide.svg"
           alt="Sweet Dreams Music - Wide Outline Logo"
           width={LOGO_INITIAL_WIDTH}
           height={LOGO_INITIAL_HEIGHT}
-          className="font-logo"
+          className="font-logo w-auto h-auto"
           priority
         />
       </motion.div>
-      {/* SDMOvalLogo fades in at the same spot instantly on snap */}
-      {hydrated && isSnapped && (
-        <motion.div
-          variants={ovalVariants}
-          animate={isSnapped ? 'snapped' : 'initial'}
-          className="fixed top-0 left-0 w-full flex justify-center pt-4 z-10 pointer-events-none"
-        >
-          <Image
-            src="/images/logos/SDMOvalLogo.svg"
-            alt="Sweet Dreams Music - Oval Logo"
-            width={LOGO_FINAL_WIDTH}
-            height={LOGO_FINAL_HEIGHT}
-            className="font-logo"
-            priority
-          />
-        </motion.div>
-      )}
       {/* Animated headline - snaps up instantly, then fades/slides out */}
       {hydrated && isSnapped && (
         <motion.div

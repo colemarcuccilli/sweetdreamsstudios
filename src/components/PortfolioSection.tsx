@@ -1,12 +1,19 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
+// import { gsap } from 'gsap'; // Temporarily remove GSAP
+// import { ScrollTrigger } from 'gsap/ScrollTrigger'; // Temporarily remove ScrollTrigger
+import PortfolioThumbnail from './portfolio/PortfolioThumbnail';
+import ProjectModal from './portfolio/ProjectModal';
 
-interface PortfolioSectionProps {
-  onEndInView?: () => void;
-}
+// if (typeof window !== 'undefined') { // Temporarily remove GSAP plugin registration
+//   gsap.registerPlugin(ScrollTrigger);
+// }
+
+// Removed onEndInView from props as it's no longer used
+// interface PortfolioSectionProps {
+//   onEndInView?: () => void;
+// }
 
 // Manually list all your PNGs in the thumbnails folder
 const projects = [
@@ -31,20 +38,18 @@ const projects = [
   // ...add more as needed
 ];
 
-export default function PortfolioSection({ onEndInView }: PortfolioSectionProps) {
+// Removed onEndInView from function signature
+export default function PortfolioSection() { 
   const sectionRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const [selectedProject, setSelectedProject] = useState<typeof projects[0] | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [hoveredProject, setHoveredProject] = useState<typeof projects[0] | null>(null);
-  const [mouse, setMouse] = useState({ x: 0, y: 0 });
-  const endRef = useRef<HTMLDivElement>(null);
   const [numCols, setNumCols] = useState(3);
+  // const endRef = useRef<HTMLDivElement>(null); // No longer needed for this specific ScrollTrigger
 
-  // Reset scroll position on mount
   useEffect(() => {
     window.scrollTo(0, 0);
     
-    // Set initial column count
     const handleResize = () => {
       if (window.innerWidth < 768) setNumCols(1);
       else if (window.innerWidth < 1024) setNumCols(2);
@@ -55,6 +60,31 @@ export default function PortfolioSection({ onEndInView }: PortfolioSectionProps)
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Temporarily removed all GSAP animations and ScrollTriggers
+  // useEffect(() => {
+  //   if (!titleRef.current) return;
+  //   const titleAnimation = gsap.fromTo(titleRef.current,
+  //     { opacity: 0, y: 40 },
+  //     {
+  //       opacity: 1,
+  //       y: 0,
+  //       duration: 0.7,
+  //       ease: "power2.out",
+  //       scrollTrigger: {
+  //         trigger: titleRef.current,
+  //         start: "top bottom-=100",
+  //         end: "top center",
+  //         toggleActions: "play none none reverse"
+  //       }
+  //     }
+  //   );
+  //   return () => {
+  //     if (titleAnimation.scrollTrigger) {
+  //       titleAnimation.scrollTrigger.kill();
+  //     }
+  //   };
+  // }, []);
 
   // Helper to split projects into columns
   function splitIntoColumns<T>(arr: T[], numCols: number): T[][] {
@@ -69,161 +99,49 @@ export default function PortfolioSection({ onEndInView }: PortfolioSectionProps)
 
   const handleThumbnailClick = (project: typeof projects[0]) => {
     setSelectedProject(project);
-    sectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-
-  // Observe when the end of the section is in view
-  useEffect(() => {
-    if (!onEndInView) return;
-    const endEl = endRef.current;
-    if (!endEl) return;
-    const observer = new window.IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) onEndInView();
-      },
-      { threshold: 0.5 }
-    );
-    observer.observe(endEl);
-    return () => observer.disconnect();
-  }, [onEndInView]);
 
   return (
     <section
       id="portfolio-section"
       ref={sectionRef}
-      className="relative w-full min-h-screen bg-background py-24 flex flex-col items-center z-30 overflow-hidden"
+      className="relative w-full min-h-screen bg-background py-24 flex flex-col items-center"
     >
-      {/* Animated phrase */}
-      <motion.h2
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: 'easeOut' }}
-        viewport={{ once: true }}
+      <h2
+        ref={titleRef}
         className="text-4xl md:text-6xl font-bold font-inter text-center mb-16 text-white drop-shadow-lg"
       >
         Witness the Vision.
-      </motion.h2>
-      {/* Folded Thumbnails Masonry Columns */}
-      <div className="w-full px-4 flex flex-row gap-4 justify-center overflow-hidden">
+      </h2>
+
+      <div className="w-full px-4 flex flex-row gap-4 justify-center">
         {columns.map((col, colIdx) => (
           <div key={colIdx} className="flex flex-col gap-4 flex-1 min-w-0">
             {col.map((project, idx) => {
-              // Find the global index for hover state
               const globalIdx = colIdx + idx * numCols;
               return (
-                <motion.div
+                <PortfolioThumbnail
                   key={project.id}
-                  className="relative rounded-xl overflow-hidden shadow-lg bg-black/40 cursor-pointer w-full"
-                  animate={{
-                    height: hoveredIndex === globalIdx ? '320px' : '80px',
-                    zIndex: hoveredIndex === globalIdx ? 10 : 1,
-                  }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                  project={project}
+                  isHovered={hoveredIndex === globalIdx}
                   onClick={() => handleThumbnailClick(project)}
-                  onMouseEnter={() => { setHoveredIndex(globalIdx); setHoveredProject(project); }}
-                  onMouseLeave={() => { setHoveredIndex(null); setHoveredProject(null); }}
-                  style={{ height: hoveredIndex === globalIdx ? 320 : 80 }}
-                >
-                  <Image
-                    src={project.thumbnail}
-                    alt={project.alt}
-                    width={600}
-                    height={400}
-                    style={{ width: '100%', height: hoveredIndex === globalIdx ? '320px' : '80px', objectFit: 'cover', transition: 'height 0.3s' }}
-                    draggable={false}
-                  />
-                  {/* Overlay for hover title */}
-                  <AnimatePresence>
-                    {hoveredIndex === globalIdx && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="absolute inset-0 flex items-center justify-center bg-black/40"
-                      >
-                        <Image
-                          src={project.title.replace('.svg', '.png')}
-                          alt="Project Title"
-                          width={120}
-                          height={40}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                  onMouseEnter={() => setHoveredIndex(globalIdx)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                />
               );
             })}
           </div>
         ))}
       </div>
-      {/* Project details and video */}
-      <AnimatePresence>
-        {selectedProject && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.5 }}
-            className="fixed inset-0 flex items-center justify-center bg-black/80 z-50"
-            onClick={() => setSelectedProject(null)}
-          >
-            <div className="flex w-full max-w-6xl mx-auto p-4" onClick={(e) => e.stopPropagation()}>
-              <motion.div
-                initial={{ x: -100, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="w-1/2 pr-4"
-              >
-                <video
-                  src={selectedProject.video}
-                  controls
-                  className="w-full rounded-lg"
-                />
-              </motion.div>
-              <motion.div
-                initial={{ x: 100, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="w-1/2 pl-4 text-white"
-              >
-                <h3 className="text-2xl font-bold mb-4">{selectedProject.alt}</h3>
-                <p>{selectedProject.details}</p>
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {/* Hover title PNG follows mouse (optional, can be re-enabled if desired) */}
-      {/*
-      <AnimatePresence>
-        {hoveredProject && (
-          <motion.div
-            style={{
-              position: 'fixed',
-              left: mouse.x,
-              top: mouse.y,
-              pointerEvents: 'none',
-              zIndex: 100,
-              transform: 'translate(-50%, -50%)',
-            }}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.2 }}
-          >
-            <Image
-              src="/images/projtitles/VerifiedbyJayValLeo.png"
-              alt="Project Title"
-              width={50}
-              height={25}
-              style={{ width: 'auto', height: 'auto' }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-      */}
-      <div ref={endRef} className="w-full h-1" />
+
+      {selectedProject && (
+        <ProjectModal
+          project={selectedProject}
+          onClose={() => setSelectedProject(null)}
+        />
+      )}
+
+      {/* <div ref={endRef} className="w-full h-1" /> */}{/* No longer needed */}
     </section>
   );
 } 
