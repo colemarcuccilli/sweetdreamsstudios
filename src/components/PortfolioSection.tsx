@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 // import { gsap } from 'gsap'; // Temporarily remove GSAP
 // import { ScrollTrigger } from 'gsap/ScrollTrigger'; // Temporarily remove ScrollTrigger
 import PortfolioThumbnail from './portfolio/PortfolioThumbnail';
-import ProjectModal from './portfolio/ProjectModal';
+// import ProjectModal from './portfolio/ProjectModal'; // Temporarily remove ProjectModal
 
 // if (typeof window !== 'undefined') { // Temporarily remove GSAP plugin registration
 //   gsap.registerPlugin(ScrollTrigger);
@@ -98,14 +98,15 @@ export default function PortfolioSection() {
   const columns: Array<typeof projects[number]>[] = splitIntoColumns(projects, numCols);
 
   const handleThumbnailClick = (project: typeof projects[0]) => {
-    setSelectedProject(project);
+    // setSelectedProject(project); // Modal removed, so no need to set it
+    console.log("Thumbnail clicked, project:", project); // Keep for testing click
   };
 
   return (
     <section
       id="portfolio-section"
       ref={sectionRef}
-      className="relative w-full min-h-screen bg-background py-24 flex flex-col items-center"
+      className="relative w-full bg-background py-24 flex flex-col items-center"
     >
       <h2
         ref={titleRef}
@@ -133,13 +134,6 @@ export default function PortfolioSection() {
           </div>
         ))}
       </div>
-
-      {selectedProject && (
-        <ProjectModal
-          project={selectedProject}
-          onClose={() => setSelectedProject(null)}
-        />
-      )}
 
       {/* <div ref={endRef} className="w-full h-1" /> */}{/* No longer needed */}
     </section>

@@ -26,7 +26,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-background text-foreground font-sans">
+      <body className="relative min-h-screen bg-background text-foreground font-sans">
         <AuthProvider>
           {/* <Navigation /> */} {/* Temporarily commented out */}
           {/* <div className="pt-20">{children}</div> */}

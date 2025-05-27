@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react'; // Keep useRef if refs are on elements, even if JS doesn't use them for GSAP
+// import { useEffect } from 'react';
 // import { gsap } from 'gsap'; // Temporarily remove GSAP
 // import { ScrollTrigger } from 'gsap/ScrollTrigger'; // Temporarily remove ScrollTrigger
 
@@ -35,17 +36,17 @@ export default function TransitionalSection() {
   return (
     <section
       ref={sectionRef}
-      className="relative w-full min-h-[60vh] md:min-h-[70vh] flex items-center justify-center overflow-hidden 
-                 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900"
-      // Replace with your abstract visual: e.g., style={{ backgroundImage: "url('/path/to/your/abstract-visual.jpg')", backgroundSize: 'cover', backgroundPosition: 'center' }}
+      id="transitional-section-debug" // Added ID for easy browser inspection
+      // Make it extremely obvious and ensure it takes up space
+      className="relative w-full h-screen flex items-center justify-center overflow-hidden bg-lime-500 selection:bg-purple-500 selection:text-white"
     >
-      <div className="absolute inset-0 bg-black/30"></div> {/* Optional overlay for text readability */}
+      {/* Removed overlay for max visibility of bg */}
       <h2
         ref={textRef}
-        className="relative z-10 text-4xl md:text-6xl lg:text-7xl font-semibold font-inter text-white text-center 
+        className="relative z-10 text-5xl md:text-7xl lg:text-8xl font-black font-inter text-black text-center 
                    leading-tight drop-shadow-2xl px-4"
       >
-        Everything You Need to Create.<br />Everything You Need to Grow.
+        TRANSITIONAL SECTION - CAN YOU SEE ME?
       </h2>
     </section>
   );
