@@ -56,6 +56,7 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
             height={40}
             className="font-logo"
             priority
+            style={{ height: 'auto' }}
           />
         </div>
 

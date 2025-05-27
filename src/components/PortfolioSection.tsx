@@ -106,7 +106,7 @@ export default function PortfolioSection() {
     <section
       id="portfolio-section"
       ref={sectionRef}
-      className="relative w-full bg-background py-24 flex flex-col items-center"
+      className="relative w-full bg-background py-24 flex flex-col items-center z-10"
     >
       <h2
         ref={titleRef}
