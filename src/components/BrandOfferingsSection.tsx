@@ -58,84 +58,79 @@ const BrandOfferingsSection: React.FC = () => {
         
         const sectionPinPixelDuration = 6000;
 
-        ScrollTrigger.create({
-          trigger: sectionRef.current,
-          start: 'top top',
-          end: `+=${sectionPinPixelDuration}`,
-          pin: true,
-          pinSpacing: true,
-          id: 'main-pin',
-          scrub: 1,
-          markers: true
-        });
+        const pinDurationMultiplier = 1;
 
-        const masterTl = gsap.timeline({
+        const animateSlide = (
+          index: number,
+          _sectionPinTrigger: HTMLDivElement | null,
+          layerElement: HTMLDivElement | null,
+          mediaElement: HTMLVideoElement | HTMLImageElement | null,
+          textContentElement: HTMLDivElement | null,
+          isLastSlide: boolean
+        ) => {
+          const tl = gsap.timeline();
+          if (!layerElement || !textContentElement) return tl;
+
+          const q = gsap.utils.selector(textContentElement);
+          const currentOpp = opportunitiesData[index];
+
+          tl.to(layerElement, {
+            opacity: 1,
+            yPercent: 0,
+            visibility: 'visible',
+            duration: 0.6,
+            ease: 'power2.inOut',
+            onStart: () => {
+              if (currentOpp.mediaType === 'video' && mediaElement instanceof HTMLVideoElement) {
+                mediaElement.currentTime = 0;
+                mediaElement.play().catch(e => console.warn(`Video play error for slide ${index}:`, e));
+              }
+            }
+          })
+          .fromTo(q('h2'), { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, "-=0.3")
+          .fromTo(q('p'), { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, "-=0.3")
+          .fromTo(q('button.cta'), { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, "-=0.3");
+
+          if (!isLastSlide) {
+            let fadeOutStartTimeInSlideTimeline = pinDurationMultiplier;
+
+            if (index === 1) {
+              fadeOutStartTimeInSlideTimeline = pinDurationMultiplier * 0.5;
+            }
+
+            tl.to(layerElement, {
+              opacity: 0,
+              duration: 0.6,
+              ease: 'power2.inOut',
+              onStart: () => { 
+                if (currentOpp.mediaType === 'video' && mediaElement instanceof HTMLVideoElement && !mediaElement.paused) {
+                  mediaElement.pause();
+                }
+              },
+            }, `${fadeOutStartTimeInSlideTimeline}`); 
+          }
+          return tl;
+        };
+
+        const masterTimeline = gsap.timeline({
           scrollTrigger: {
             trigger: sectionRef.current,
             start: 'top top',
             end: `+=${sectionPinPixelDuration}`,
+            pin: true,
+            pinSpacing: true,
             scrub: 1,
-            id: 'master-timeline-st',
+            markers: true,
+            id: 'master-control-st'
           }
         });
 
-        const pinDurationMultiplier = 1;
-
-        layers.forEach((layer, index) => {
-          const currentOpp = opportunitiesData[index];
-          const mediaElement = mediaRefs.current[index];
-          const textContent = textContents[index];
-          const q = gsap.utils.selector(textContent);
-
-          const individualContentTl = gsap.timeline({ paused: true });
-          individualContentTl
-            .fromTo(q('h2'), { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' })
-            .fromTo(q('p'), { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, "-=0.2")
-            .fromTo(q('button.cta'), { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, "-=0.2");
-
-          const layerAnimationStartTime = index * pinDurationMultiplier;
-
-          masterTl.to(layer, {
-            opacity: 1,
-            yPercent: 0,
-            visibility: 'visible',
-            duration: 0.5,
-            ease: 'power1.inOut',
-            onComplete: () => { 
-              individualContentTl.play(); 
-              if (currentOpp.mediaType === 'video' && mediaElement instanceof HTMLVideoElement) {
-                mediaElement.play().catch(e=>console.warn('Play error on layer complete', e));
-              }
-            },
-            onReverseComplete: () => { 
-              individualContentTl.reverse(0).pause(); 
-            }, 
-          }, layerAnimationStartTime); 
-
-          if (index > 0 && layers[index - 1]) {
-            masterTl.to(layers[index - 1], { 
-              opacity: 0, 
-              duration: 0.5,
-              ease: 'power1.inOut',
-              onStart: () => {
-                const prevOpp = opportunitiesData[index-1];
-                const prevMediaElement = mediaRefs.current[index-1];
-                if (prevOpp.mediaType === 'video' && prevMediaElement instanceof HTMLVideoElement) {
-                  prevMediaElement.pause();
-                }
-              }
-            }, layerAnimationStartTime);
-          }
-
-          if (currentOpp.mediaType === 'video' && mediaElement instanceof HTMLVideoElement) {
-             masterTl.add(() => {
-                const isActiveLayer = gsap.getProperty(layer, "opacity") === 1;
-                if (!isActiveLayer && !mediaElement.paused) {
-                    mediaElement.pause();
-                }
-            }, layerAnimationStartTime + 0.5);
-          }
+        opportunitiesData.forEach((opportunity, i) => {
+          const isLastSlide = i === opportunitiesData.length - 1;
+          const startTime = i === 2 ? 1.5 * pinDurationMultiplier : i * pinDurationMultiplier;
+          masterTimeline.add(animateSlide(i, sectionRef.current, layerRefs.current[i], mediaRefs.current[i], textContentRefs.current[i], isLastSlide), startTime);
         });
+
         ScrollTrigger.refresh();
       }, sectionRef);
       return () => {
