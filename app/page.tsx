@@ -48,6 +48,10 @@ export default function Home() {
         {/* <div ref={portfolioStickyRef} style={{ position: 'sticky', top: 0, zIndex: 10 }}> // Removed sticky wrapper */}
           <PortfolioSection />
           <BrandOfferingsSection />
+          {/* Temporary tall div for scroll debugging */}
+          <div style={{ height: '2000px', background: 'lightcoral' }}> 
+            <p>Temporary content to ensure scrollability. You should see this after Brand Offerings section if pinning works correctly.</p>
+          </div>
         {/* </div> */}
         {/* Removed scroll trap and BrandOfferingsSection */}
         {/* <div ref={scrollTrapRef} style={{ height: '120vh', position: 'relative' }} /> */}
