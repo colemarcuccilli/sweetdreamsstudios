@@ -7,7 +7,7 @@ import Navigation from '@/components/Navigation';
 import HeroHeader from '@/components/HeroHeader';
 import PortfolioSection from '@/components/PortfolioSection';
 import BrandOfferingsSection from '@/components/BrandOfferingsSection';
-import StickerSection from '@/components/StickerSection';
+import ClientBenefitsSection from '@/components/ClientBenefitsSection';
 // import BrandOfferingsSection from '@/components/BrandOfferingsSection'; // Removed
 
 export default function Home() {
@@ -49,11 +49,13 @@ export default function Home() {
         {/* <div ref={portfolioStickyRef} style={{ position: 'sticky', top: 0, zIndex: 10 }}> // Removed sticky wrapper */}
           <PortfolioSection />
           <BrandOfferingsSection />
-          <StickerSection />
+          <ClientBenefitsSection />
           {/* Temporary tall div for scroll debugging */}
+          {/* 
           <div style={{ height: '2000px', background: 'lightcoral' }}> 
             <p>Temporary content to ensure scrollability. You should see this after Brand Offerings section if pinning works correctly.</p>
           </div>
+          */}
         {/* </div> */}
         {/* Removed scroll trap and BrandOfferingsSection */}
         {/* <div ref={scrollTrapRef} style={{ height: '120vh', position: 'relative' }} /> */}

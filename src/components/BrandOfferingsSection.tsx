@@ -58,7 +58,7 @@ const BrandOfferingsSection: React.FC = () => {
         
         const sectionPinPixelDuration = 6000;
 
-        const pinDurationMultiplier = 1;
+        const pinDurationMultiplier = 3.5;
 
         const animateSlide = (
           index: number,
@@ -92,11 +92,8 @@ const BrandOfferingsSection: React.FC = () => {
           .fromTo(q('button.cta'), { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, "-=0.3");
 
           if (!isLastSlide) {
-            let fadeOutStartTimeInSlideTimeline = pinDurationMultiplier;
-
-            if (index === 1) {
-              fadeOutStartTimeInSlideTimeline = pinDurationMultiplier * 0.5;
-            }
+            const fadeOutDelayBase = pinDurationMultiplier - 0.5;
+            const fadeOutStartTimeInSlideTimeline = Math.max(1.5, fadeOutDelayBase);
 
             tl.to(layerElement, {
               opacity: 0,
@@ -107,7 +104,7 @@ const BrandOfferingsSection: React.FC = () => {
                   mediaElement.pause();
                 }
               },
-            }, `${fadeOutStartTimeInSlideTimeline}`); 
+            }, `${fadeOutStartTimeInSlideTimeline}`);
           }
           return tl;
         };
@@ -127,7 +124,7 @@ const BrandOfferingsSection: React.FC = () => {
 
         opportunitiesData.forEach((opportunity, i) => {
           const isLastSlide = i === opportunitiesData.length - 1;
-          const startTime = i === 2 ? 1.5 * pinDurationMultiplier : i * pinDurationMultiplier;
+          const startTime = i * pinDurationMultiplier;
           masterTimeline.add(animateSlide(i, sectionRef.current, layerRefs.current[i], mediaRefs.current[i], textContentRefs.current[i], isLastSlide), startTime);
         });
 
