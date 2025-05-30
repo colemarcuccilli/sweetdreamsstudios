@@ -84,7 +84,7 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
           {user ? (
             <>
               <Link
-                href="/profile/setup"
+                href="/profile/edit"
                 className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
               >
                 My Account 
@@ -114,7 +114,7 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
           )}
           <Link
             href="/book"
-            className="rounded-lg px-4 py-2 font-semibold bg-accent-blue text-white hover:bg-accent-red transition-colors shadow-sm"
+            className="rounded-lg px-4 py-2 font-semibold bg-accent-green text-white hover:bg-accent-green/80 transition-colors shadow-sm"
           >
             Book Now
           </Link>
@@ -167,7 +167,7 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
             {user ? (
               <>
                 <Link
-                  href="/profile/setup"
+                  href="/profile/edit"
                   className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
@@ -203,7 +203,7 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
             )}
             <Link
               href="/book"
-              className="mt-4 rounded-lg px-6 py-3 font-semibold bg-accent-blue text-white hover:bg-accent-red transition-colors shadow-sm text-center w-full max-w-xs"
+              className="mt-4 rounded-lg px-6 py-3 font-semibold bg-accent-green text-white hover:bg-accent-green/80 transition-colors shadow-sm text-center w-full max-w-xs"
               onClick={() => setMobileMenuOpen(false)}
             >
               Book Now

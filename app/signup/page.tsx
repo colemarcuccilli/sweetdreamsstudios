@@ -29,6 +29,7 @@ const SignupPage = () => {
       displayName: user.displayName || email.split('@')[0],
       photoURL: user.photoURL,
       createdAt: serverTimestamp(),
+      isAdmin: false,
       ...additionalData
     };
     try {
