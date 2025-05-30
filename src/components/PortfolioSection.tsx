@@ -87,10 +87,10 @@ export default function PortfolioSection() {
       <div className="absolute inset-0 w-full h-full overflow-hidden z-0">
         {projects.map((project, idx) => (
           <img
-            key={project.id}
+                  key={project.id}
             ref={el => { backgroundRefs.current[idx] = el; }}
-            src={project.thumbnail}
-            alt={project.alt}
+                    src={project.thumbnail}
+                    alt={project.alt}
             className="absolute inset-0 w-full h-full object-cover opacity-0" // Initial opacity 0, GSAP handles it
           />
         ))}
@@ -126,7 +126,7 @@ export default function PortfolioSection() {
             ))}
           </ul>
         </div>
-      </div>
+            </div>
 
       {/* Use the new ProjectModal component */}
       <ProjectModal project={projectForModal} onClose={closeModal} />
