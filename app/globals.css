@@ -3,3 +3,12 @@
 @tailwind utilities;
 
 /* Your custom global styles can go here */
+
+html,
+body {
+    /* Fallback background color */
+    background-color: #000000;
+    /* Black, change if your theme is light */
+    /* You can also try setting a specific color from your theme if you know it */
+    /* e.g., background-color: hsl(var(--background)); if --background is a HSL variable */
+}

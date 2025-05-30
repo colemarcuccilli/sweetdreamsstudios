@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link'; // Added Link import
 // import { motion, useAnimation, useInView, useScroll, useTransform } from 'framer-motion'; // Removed Framer Motion imports for scroll effects
 import { motion } from 'framer-motion'; // Keep motion if other components use it, or remove if not. Assuming it might still be used by Navigation/HeroHeader or their subcomponents.
 import Navigation from '@/components/Navigation';
@@ -11,6 +12,7 @@ import ClientBenefitsSection from '@/components/ClientBenefitsSection';
 // import BrandOfferingsSection from '@/components/BrandOfferingsSection'; // Removed
 
 export default function Home() {
+  // const { user, logout, loading } = useAuth(); // Usage removed
   const [isNavVisible, setIsNavVisible] = useState(false);
   const navTimeout = useRef<NodeJS.Timeout | null>(null);
 

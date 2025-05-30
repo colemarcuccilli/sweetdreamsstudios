@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'; // Import Image for the logo
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/context/AuthContext'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { motion } from 'framer-motion'; // Import motion
 
@@ -19,11 +19,30 @@ interface NavigationProps {
 
 export default function Navigation({ navShouldBeVisible }: NavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, logout, loading } = useAuth();
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => { setHasMounted(true); }, []);
 
-  if (!hasMounted) return null;
+  if (!hasMounted || loading) {
+    if (!navShouldBeVisible) return null;
+    return (
+        <motion.header 
+          id="main-navbar-loading"
+          className="fixed inset-x-0 top-0 z-50 bg-[color:var(--background)] text-[color:var(--foreground)] shadow-md h-[68px]"
+          initial={{ opacity: 0, y: -100 }}
+          animate={navShouldBeVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: -100 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+        >
+            <nav className="container mx-auto flex items-center justify-between py-3 px-4 sm:px-6 lg:px-8">
+                 <div className="flex-1"></div>
+                <div className="h-10 w-20 bg-gray-700 animate-pulse rounded"></div>
+                <div className="flex-1 flex justify-end">
+                    <div className="h-8 w-16 bg-gray-700 animate-pulse rounded"></div>
+                </div>
+            </nav>
+        </motion.header>
+    );
+  }
 
   return (
     <motion.header 
@@ -63,19 +82,35 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
         {/* Right: Auth Links & Book Now */}
         <div className="hidden md:flex items-center gap-4">
           {user ? (
-            <Link
-              href="/dashboard"
-              className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
-            >
-              Dashboard
-            </Link>
+            <>
+              <Link
+                href="/profile/setup"
+                className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+              >
+                My Account 
+              </Link>
+              <button
+                onClick={logout}
+                className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+              >
+                Logout
+              </button>
+            </>
           ) : (
-            <Link
-              href="/login"
-              className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
-            >
-              Login
-            </Link>
+            <>
+              <Link
+                href="/login"
+                className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+              >
+                Login
+              </Link>
+              <Link
+                href="/signup"
+                className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+              >
+                Sign Up
+              </Link>
+            </>
           )}
           <Link
             href="/book"
@@ -130,21 +165,41 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
               </Link>
             ))}
             {user ? (
-              <Link
-                href="/dashboard"
-                className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Dashboard
-              </Link>
+              <>
+                <Link
+                  href="/profile/setup"
+                  className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  My Account
+                </Link>
+                <button
+                  onClick={async () => {
+                    await logout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors w-full text-center"
+                >
+                  Logout
+                </button>
+              </>
             ) : (
-              <Link
-                href="/login"
-                className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Login
-              </Link>
+              <>
+                <Link
+                  href="/login"
+                  className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/signup"
+                  className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Sign Up
+                </Link>
+              </>
             )}
             <Link
               href="/book"

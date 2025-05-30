@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css'; // Changed path to local
-import { AuthProvider } from '@/lib/auth-context'; // Assuming lib/auth-context.tsx
+import { AuthProvider } from '../src/context/AuthContext'; // Corrected path
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 

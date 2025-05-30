@@ -171,19 +171,19 @@ const BrandOfferingsSection: React.FC = () => {
                   preload="auto"
                 ></video>
               )}
-            </div>
+      </div>
             <div 
               ref={el => { textContentRefs.current[index] = el; }}
               className="text-content md:w-1/2 text-white text-center md:text-left"
               style={{ textShadow: '0px 0px 8px rgba(0,0,0,0.7)' }} 
-            >
+          >
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">{opp.headline}</h2>
               <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8">{opp.description}</p>
               <button className="cta bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-8 rounded-lg text-lg sm:text-xl transition-colors duration-300 shadow-md hover:shadow-lg">
                 {opp.ctaText}
               </button>
             </div>
-          </div>
+      </div>
         </div>
       ))}
     </section>
