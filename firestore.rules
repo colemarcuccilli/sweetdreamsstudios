@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Bookings collection
+    match /bookings/{bookingId} {
+      // Allow anyone authenticated to read bookings (to see unavailable slots)
+      allow read: if request.auth != null;
+      // Allow authenticated users to create bookings if the userId in the document matches their auth.uid
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // Allow users to update or delete their own bookings
+      // (For now, we'll keep it simple. Admin roles can be added later)
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Users collection (assuming you have one for profile info)
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+} 
