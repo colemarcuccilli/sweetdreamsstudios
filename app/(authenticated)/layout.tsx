@@ -33,14 +33,15 @@ const adminNavLinks = [
   { name: 'Invite Admin', href: '/admin/invite', icon: UserPlusIcon, isPrimaryCTA: false },
 ];
 
-export default function ProfileLayout({ children }: { children: React.ReactNode }) {
+// This is now a simple presentational layout.
+// All auth logic is handled by the root layout's AuthProvider.
+export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, isAdmin, loading, logout } = useAuth(); // Using isAdmin from context
+  const { user, isAdmin, loading, logout } = useAuth();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Combine links based on admin status
-  const profileNavLinks = isAdmin ? [...baseNavLinks, ...adminNavLinks] : baseNavLinks;
+  const navLinks = isAdmin ? [...baseNavLinks, ...adminNavLinks] : baseNavLinks;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -81,27 +82,17 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
 
         <nav className="flex-grow">
           <ul className="space-y-2">
-            {profileNavLinks.map((item) => {
-              const isActive = (pathname && pathname === item.href) || 
-                               (pathname && item.href === '/book' && pathname.startsWith('/book')) ||
-                               (pathname && item.href === '/admin/dashboard' && pathname.startsWith('/admin/dashboard')) ||
-                               (pathname && item.href === '/admin/schedule' && pathname.startsWith('/admin/schedule')) ||
-                               (pathname && item.href === '/admin/invite' && pathname.startsWith('/admin/invite'));
+            {navLinks.map((item) => {
+              const isActive = pathname === item.href;
               
-              let linkClasses = `flex items-center space-x-3 p-3 rounded-lg transition-colors duration-150 ${!sidebarOpen ? 'justify-center' : ''}`;
-              let iconClasses = `h-6 w-6`;
-              let textClasses = `font-medium text-sm font-logo whitespace-nowrap`;
-
-              if (item.isPrimaryCTA) {
-                linkClasses += ' bg-accent-green text-white hover:bg-accent-green/90 shadow-sm';
-                if (isActive) linkClasses += ' ring-2 ring-white/50';
-                iconClasses += ' text-white';
-              } else {
-                linkClasses += isActive 
-                  ? ' bg-accent-blue text-white shadow-md' 
-                  : ' text-foreground/70 hover:bg-accent-yellow/30 hover:text-foreground';
-                iconClasses += isActive ? ' text-white' : ' text-accent-pink';
-              }
+              const linkClasses = `flex items-center space-x-3 p-3 rounded-lg transition-colors duration-150 ${!sidebarOpen ? 'justify-center' : ''} ${
+                item.isPrimaryCTA
+                  ? `bg-accent-green text-white hover:bg-accent-green/90 shadow-sm ${isActive ? 'ring-2 ring-white/50' : ''}`
+                  : isActive
+                  ? 'bg-accent-blue text-white shadow-md'
+                  : 'text-foreground/70 hover:bg-accent-yellow/30 hover:text-foreground'
+              }`;
+              const iconClasses = `h-6 w-6 ${item.isPrimaryCTA ? 'text-white' : 'text-accent-pink'}`;
 
               return (
                 <li key={item.name}>
@@ -111,7 +102,7 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
                     title={!sidebarOpen ? item.name : undefined}
                   >
                     <item.icon className={iconClasses} />
-                    {sidebarOpen && <span className={textClasses}>{item.name}</span>}
+                    {sidebarOpen && <span className="font-medium text-sm font-logo whitespace-nowrap">{item.name}</span>}
                   </Link>
                 </li>
               );

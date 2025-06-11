@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, User as FirebaseUser, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth, firestore } from '../../firebase/config'; // Adjust path based on your file structure
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
@@ -23,30 +23,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false); // Set loading to false immediately
-      
-      // Admin check is now separate and does not block rendering
+      setUser(currentUser); // This ensures the user state is updated on login/logout.
+
       if (currentUser) {
-        // TEMPORARY OVERRIDE: Hardcode the primary admin's email for immediate access.
-        // The permanent solution will be to manage admins via the dashboard.
-        if (currentUser.email === 'jayvalleo@sweetdreamsmusic.com') {
-          setIsAdmin(true);
-        } else {
-          // Original check for other potential admins
-          const checkAdminStatus = async () => {
+        setLoading(true); // We are loading while we check the user's admin status.
+        const checkAdminAndSync = async () => {
+          try {
             const adminDocRef = doc(firestore, 'admins', currentUser.uid);
             const adminDoc = await getDoc(adminDocRef);
-            setIsAdmin(adminDoc.exists() && adminDoc.data()?.isAdmin === true);
-          };
-          checkAdminStatus();
-        }
+            
+            const isAdminStatus = adminDoc.exists();
+            setIsAdmin(isAdminStatus);
+
+            // Sync the admin status to the user's public document for consistency.
+            if (isAdminStatus) {
+              const userDocRef = doc(firestore, 'users', currentUser.uid);
+              await setDoc(userDocRef, { isAdmin: true }, { merge: true });
+            }
+          } catch (error) {
+            console.error("Error checking admin status:", error);
+            setIsAdmin(false);
+          } finally {
+            setLoading(false); // Finished checking admin status.
+          }
+        };
+        checkAdminAndSync();
       } else {
-        setIsAdmin(false); // Not logged in, not an admin
+        // No user is logged in, so they are not an admin and we are not loading.
+        setIsAdmin(false);
+        setLoading(false);
       }
     });
     return () => unsubscribe();
-  }, []); // No dependencies needed
+  }, []);
 
   const logout = async () => {
     try {

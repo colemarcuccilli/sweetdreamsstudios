@@ -20,23 +20,31 @@ const SignupPage = () => {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const createUserDocument = async (user: User, additionalData: object = {}) => {
+  const createUserDocument = async (user: User, additionalData: { phoneNumber?: string } = {}) => {
     if (!user) return;
     const userRef = doc(firestore, `users/${user.uid}`);
+    
     const userData = {
       uid: user.uid,
       email: user.email,
-      displayName: user.displayName || email.split('@')[0],
-      photoURL: user.photoURL,
+      displayName: user.displayName || user.email?.split('@')[0] || 'New User',
+      photoURL: user.photoURL || '',
+      firstName: '',
+      lastName: '',
+      artistName: '',
+      hometown: '',
+      phoneNumber: additionalData.phoneNumber || '',
+      socialLinks: { instagram: '', twitter: '', spotify: '' },
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
       isAdmin: false,
-      ...additionalData
     };
+
     try {
-      await setDoc(userRef, userData);
-      console.log('User document created/updated in Firestore');
+      await setDoc(userRef, userData, { merge: true });
+      console.log('Standardized user document created in Firestore');
     } catch (firestoreError: any) {
-      console.error("Error creating/updating user document in Firestore:", firestoreError);
+      console.error("Error creating user document in Firestore:", firestoreError);
       setError("Error saving user data: " + firestoreError.message);
       throw firestoreError;
     }
@@ -56,8 +64,8 @@ const SignupPage = () => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       console.log('Signed up successfully with primary form!', userCredential.user);
-      await createUserDocument(userCredential.user, { phoneNumber: phoneNumber });
-      router.push('/profile/setup');
+      await createUserDocument(userCredential.user, { phoneNumber });
+      router.push('/profile/edit');
     } catch (err: any) {
       if (err.code && err.code.startsWith('auth/')) {
         setError(err.message);
@@ -75,7 +83,7 @@ const SignupPage = () => {
       const userCredential = await signInWithPopup(auth, provider);
       console.log('Signed up successfully with Google!', userCredential.user);
       await createUserDocument(userCredential.user, { phoneNumber: '' });
-      router.push('/profile/setup');
+      router.push('/profile/edit');
     } catch (err: any) {
       if (err.code && err.code.startsWith('auth/')) {
         setError(err.message);
@@ -109,7 +117,7 @@ const SignupPage = () => {
             <label htmlFor="confirmPassword" style={{ display: 'block', marginBottom: '8px', color: '#555' }}>Confirm Password*</label>
             <input type="password" id="confirmPassword" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }} />
           </div>
-          <button type="submit" style={{ width: '100%', padding: '12px', background: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px', marginBottom: '10px' }}>Sign Up</button>
+          <button type="submit" style={{ width: '100%', padding: '12px', background: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px', marginBottom: '10px' }}>Sign Up & Edit Profile</button>
         </form>
 
         <div style={{ display: 'flex', alignItems: 'center', textAlign: 'center', margin: '20px 0' }}>
