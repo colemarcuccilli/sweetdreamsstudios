@@ -1,0 +1,93 @@
+# PRODUCT REQUIREMENTS DOCUMENT (PRD): Sweet Dreams Music Studio Booking Platform - Phase 1 (Detailed)
+
+## 1. Introduction
+
+This document provides a comprehensive and detailed breakdown of the requirements for **Phase 1: The Sweet Dreams Music Studio Booking Platform**. This initial phase is exclusively dedicated to developing a robust, user-centric, and efficient web application for managing the booking of Sweet Dreams Music's studio resources. The platform will provide a seamless experience for both clients seeking to book studio time and internal staff responsible for managing studio operations.
+
+## 2. Goals & Objectives
+
+* **Primary Goal:** To establish a fully functional and reliable online booking platform that streamlines studio scheduling, maximizes resource utilization, and facilitates secure deposit payments.
+* **Objective 1: Intuitive Client Booking Experience:** Design a clear, user-friendly interface that allows clients to easily find, select, and book available studio resources with minimal friction.
+* **Objective 2: Efficient Studio Management Tools:** Provide studio staff with comprehensive tools to effectively manage resource availability, pricing, and booking schedules.
+* **Objective 3: Secure and Reliable Payment Processing:** Integrate Stripe to ensure secure and transparent deposit collection at the time of booking.
+* **Objective 4: Real-time Availability and Communication:** Implement real-time calendar views and automated notifications to keep both clients and staff informed about booking status and availability.
+* **Objective 5: Lay a Solid Technical Foundation:** Build a well-structured and maintainable codebase using Firebase and React/Next.js, ensuring scalability and ease of future development.
+
+## 3. Target Users
+
+* **Clients (Artists, Musicians, Producers):**
+    * Individuals or groups needing to book recording studios, mixing suites, mastering rooms, or specific equipment within Sweet Dreams Music locations.
+    * Users with varying levels of technical proficiency, requiring a straightforward and accessible booking process.
+    * Users who value clear information about studio facilities, pricing, and availability.
+    * Users who expect a secure and reliable online booking experience.
+* **Studio Staff/Admins (Sweet Dreams Music Staff, Studio Managers, Head Engineers):**
+    * Personnel responsible for the overall management of Sweet Dreams Music studio operations.
+    * Individuals who need to define and manage studio and resource availability.
+    * Staff who handle pricing configurations and booking oversight.
+    * Admins responsible for managing user accounts and platform settings.
+
+## 4. Key Features & Functionality (Detailed)
+
+### 4.1 Client-Facing Booking Experience
+
+* **4.1.1 Studio & Resource Discovery:**
+    * **Browse Studios:** Display a list of Sweet Dreams Music studio locations (if multiple exist), each with a clear name, brief description, key features, and a primary image.
+    * **View Studio Details:** Dedicated pages for each studio with comprehensive information: detailed description, full equipment list categorized by type, high-resolution photo gallery, and potentially virtual tours (future enhancement).
+    * **Browse Resources within Studios:** Once a studio is selected, allow users to browse specific bookable resources within that studio (e.g., "Studio A - Main Room," "Mixing Suite B"). Each resource will have its own name, description, and specific features.
+    * **Staff/Engineer Profiles (Linked to Resources):** Display profiles of associated engineers (if applicable to the booking type), including their bio, specialties, and availability (integrated into the resource calendar).
+    * **Filtering & Sorting:** Implement robust filtering options (e.g., by date, time range, specific equipment, price range) and sorting options (e.g., by price, rating - future enhancement).
+
+* **4.1.2 Live Interactive Availability Calendar:**
+    * **Resource-Specific Calendars:** Display a clear, interactive calendar for the selected studio or specific resource.
+    * **Real-time Updates:** Ensure the calendar reflects the most up-to-date availability, dynamically updating as bookings are made.
+    * **Visual Representation:** Use distinct visual cues (e.g., color-coding) to differentiate between available slots, confirmed bookings, and blocked-out times.
+    * **Time Slot Granularity:** Allow users to view availability in hourly or half-hourly increments.
+    * **Date Navigation:** Easy navigation between days, weeks, and months.
+    * **Timezone Awareness:** Clearly display times in the user's local timezone.
+
+* **4.1.3 Intuitive Session Booking Flow:**
+    * **Date & Time Selection:** Direct selection of start time and date by clicking on available slots in the calendar.
+    * **Duration Selection:** Offer predefined session durations (e.g., 2 hours, 4 hours, 8 hours) and an option for custom duration input. Clearly indicate minimum and maximum booking durations for each resource.
+    * **Booking Summary:** Display a clear summary of the selected studio/resource, date, start time, duration, and the calculated total cost before deposit.
+    * **Deposit Calculation:** Clearly display the required deposit amount based on the studio's pricing rules (e.g., percentage of total, fixed amount).
+    * **Client Information Form:** Collect necessary client details: full name, email address, phone number. Allow registered users to auto-fill this information.
+    * **Booking Notes:** Provide a text area for clients to add specific requests or information about their session.
+    * **Stripe Payment Integration:** Embed a secure Stripe payment form directly within the booking flow to collect credit card or other payment method details for the deposit. Provide clear visual feedback on payment status.
+
+* **4.1.4 Booking Confirmation & Management:**
+    * **Immediate Confirmation:** Display a prominent success message upon successful deposit payment, including a booking reference number and a summary of the booking details.
+    * **Automated Email Confirmation:** Send a detailed confirmation email to the client's provided email address, including all booking information, cancellation policy, studio address, contact information, and a link to their booking in their dashboard.
+    * **ICS Calendar Attachment:** Attach a `.ics` file to the confirmation email, allowing seamless addition of the booking to the client's preferred calendar application.
+    * **Client Dashboard:**
+        * Display a list of the client's upcoming bookings with key details (date, time, studio, status).
+        * Display a history of past bookings.
+        * Allow clients to view the full details of each booking.
+        * Implement a clear and user-friendly cancellation process with information on potential fees or restrictions based on the studio's cancellation policy.
+
+### 4.2 Admin & Staff Management Interface
+
+* **4.2.1 Studio & Resource Management:**
+    * **Studio Management:** Interface to add new studio locations, edit existing studio details (name, description, address, images, equipment list), and manage studio-specific settings.
+    * **Resource Management:** Section to add, edit, and remove individual bookable resources (rooms, specific equipment). Define resource type, capacity, and association with a specific studio.
+    * **Engineer Management:** Create and manage profiles for in-house and freelance engineers, including their bio, specialties, contact information, and association with specific studios and resources.
+
+* **4.2.2 Availability Management:**
+    * **Resource Calendars:** Dedicated calendar views for each studio and bookable resource.
+    * **Recurring Availability:** Set up recurring weekly availability schedules with specific start and end times for each day of the week.
+    * **Block Unavailability:** Intuitive tools (e.g., click-and-drag on the calendar) to block out specific date ranges or time slots for maintenance, events, staff holidays, etc.
+    * **Engineer Availability Integration:** Allow engineers (with appropriate permissions) to manage their own availability, which is reflected in the resource calendars.
+
+* **4.2.3 Pricing & Payments:**
+    * **Base Rates:** Set the default hourly rate for each studio and bookable resource.
+    * **Package Deals:** Define and manage package deals (e.g., discounted rates for multi-hour bookings, day rates). Specify the duration, price, and applicable resources.
+    * **Custom Pricing Rules:** Implement options for creating more complex pricing rules (e.g., different rates for peak/off-peak hours, weekend rates).
+    * **Deposit Configuration:** Set the default deposit percentage or a fixed deposit amount required for bookings. Allow for overriding deposit settings for specific resources or booking durations.
+    * **Payment Tracking:** View the payment status of each booking (deposit paid, full amount paid - future enhancement).
+    * **Refund Management (Future):** Interface to initiate and track refunds through Stripe.
+
+* **4.2.4 Booking Overview & Control:**
+    * **Master Booking Calendar:** A centralized calendar displaying all confirmed and pending bookings across all studios and resources. Different visual cues to distinguish booking statuses and resource types.
+    * **Booking List View:** An alternative list view of all bookings with detailed information (client name, resource, date, time, status, payment).
+    * **Filtering & Search:** Robust filtering options (by studio, resource, date range, status, client name) and a search function to quickly locate specific bookings.
+    * **Manual Booking Creation:** Admin interface to manually create bookings (e.g., for phone inquiries or in-person bookings). Option to bypass deposit payment if necessary.
+    * **Booking Editing:** Ability to modify existing booking details

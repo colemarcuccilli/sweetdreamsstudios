@@ -83,12 +83,12 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
         <div className="hidden md:flex items-center gap-4">
           {user ? (
             <>
-              <Link
+            <Link
                 href="/profile/edit"
-                className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
-              >
+              className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+            >
                 My Account 
-              </Link>
+            </Link>
               <button
                 onClick={logout}
                 className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
@@ -98,12 +98,12 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
             </>
           ) : (
             <>
-              <Link
-                href="/login"
-                className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
-              >
-                Login
-              </Link>
+            <Link
+              href="/login"
+              className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+            >
+              Login
+            </Link>
               <Link
                 href="/signup"
                 className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
@@ -166,13 +166,13 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
             ))}
             {user ? (
               <>
-                <Link
+              <Link
                   href="/profile/edit"
-                  className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
                   My Account
-                </Link>
+              </Link>
                 <button
                   onClick={async () => {
                     await logout();
@@ -185,13 +185,13 @@ export default function Navigation({ navShouldBeVisible }: NavigationProps) {
               </>
             ) : (
               <>
-                <Link
-                  href="/login"
-                  className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Login
-                </Link>
+              <Link
+                href="/login"
+                className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Login
+              </Link>
                 <Link
                   href="/signup"
                   className="font-medium text-[color:var(--foreground)] hover:text-accent-blue transition-colors"

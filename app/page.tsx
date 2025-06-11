@@ -56,7 +56,7 @@ export default function Home() {
           {/* 
           <div style={{ height: '2000px', background: 'lightcoral' }}> 
             <p>Temporary content to ensure scrollability. You should see this after Brand Offerings section if pinning works correctly.</p>
-          </div>
+        </div>
           */}
         {/* </div> */}
         {/* Removed scroll trap and BrandOfferingsSection */}

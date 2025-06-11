@@ -52,6 +52,9 @@ const BrandOfferingsSection: React.FC = () => {
 
     const timerId = setTimeout(() => {
       const ctx = gsap.context(() => {
+        // Only show markers in development
+        const showMarkers = process.env.NODE_ENV === 'development';
+
         layers.forEach((layer) => {
           gsap.set(layer, { opacity: 0, visibility: 'hidden', yPercent: 50 });
         });
@@ -117,7 +120,7 @@ const BrandOfferingsSection: React.FC = () => {
             pin: true,
             pinSpacing: true,
             scrub: 1,
-            markers: true,
+            markers: showMarkers,
             id: 'master-control-st'
           }
         });
@@ -132,6 +135,12 @@ const BrandOfferingsSection: React.FC = () => {
       }, sectionRef);
       return () => {
         ctx.revert();
+        // As a fallback, try to disable markers on all ScrollTriggers
+        // This is a bit of a sledgehammer but can help if markers are persisting
+        if (process.env.NODE_ENV === 'development') {
+          ScrollTrigger.getAll().forEach(st => st.vars.markers = false);
+          ScrollTrigger.refresh(); // Refresh to apply marker changes
+        }
       };
     }, 500);
 

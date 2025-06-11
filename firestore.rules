@@ -1,21 +1,54 @@
 rules_version = '2';
+
+// Helper function to check for admin role by seeing if the user's UID
+// exists as a document ID in the 'admins' collection.
+function isAdmin() {
+  return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+}
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Bookings collection
+
+    // Bookings Collection Rules
     match /bookings/{bookingId} {
-      // Allow anyone authenticated to read bookings (to see unavailable slots)
+      // Allow reading bookings if user is authenticated. This is needed for the calendar
+      // to show unavailable slots. Admins have read access via this rule too.
       allow read: if request.auth != null;
-      // Allow authenticated users to create bookings if the userId in the document matches their auth.uid
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      // Allow users to update or delete their own bookings
-      // (For now, we'll keep it simple. Admin roles can be added later)
-      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      
+      // Allow a user to create a booking if they are logged in, the booking is for themself,
+      // and they have a user profile document.
+      allow create: if request.auth != null 
+                    && request.resource.data.userId == request.auth.uid
+                    && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      
+      // Allow a user to update their own booking (but NOT change the status),
+      // OR allow an admin to update any part of any booking.
+      allow update: if request.auth != null &&
+                    ( (resource.data.userId == request.auth.uid && request.resource.data.status == resource.data.status) || isAdmin() );
+
+      // Allow users to delete their own bookings, or admins to delete any booking.
+      allow delete: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // Users collection (assuming you have one for profile info)
+    // Users Collection Rules
     match /users/{userId} {
+      // Any authenticated user can read user profiles.
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+
+      // A user can write to their own document, or an admin can write to any user document.
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
+    // Admins Collection Rules
+    match /admins/{userId} {
+      // IMPORTANT: This rule is required for the isAdmin() function to work.
+      // It allows any authenticated user to check for the existence of an admin document.
+      // This is secure because the document itself contains no sensitive data.
+      allow read: if request.auth != null;
+      
+      // Only existing admins can create new admin documents.
+      // The first admin must be created manually in the Firebase Console.
+      allow write: if isAdmin(); 
     }
   }
 } 

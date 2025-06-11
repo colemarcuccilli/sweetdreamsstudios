@@ -6,34 +6,41 @@ import { useAuth } from '../../src/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  UserCircleIcon,       // For Edit Profile
-  ViewfinderCircleIcon, // For My Schedule (To-Do)
-  BuildingStorefrontIcon, // For Book a Studio
-  CalendarDaysIcon,     // For My Bookings (if kept)
+  UserCircleIcon,
+  BuildingStorefrontIcon,
+  CalendarDaysIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
   ArrowLeftOnRectangleIcon,
+  Cog6ToothIcon,
+  UserPlusIcon,
 } from '@heroicons/react/24/outline';
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
-// Updated order and items
-const profileNavLinks = [
+const baseNavLinks = [
   { name: 'Edit Profile', href: '/profile/edit', icon: UserCircleIcon },
-  { name: 'My Schedule', href: '/profile/schedule', icon: ViewfinderCircleIcon }, // User called this "To-Do"
   { 
-    name: 'Book',
+    name: 'Book A Session',
     href: '/book', 
     icon: BuildingStorefrontIcon, 
-    isPrimaryCTA: true // Flag for special green styling
+    isPrimaryCTA: true,
   },
-  // { name: 'My Bookings', href: '/profile/bookings', icon: CalendarDaysIcon }, // Commented out for now, pending user confirmation
+];
+
+const adminNavLinks = [
+  { name: 'Admin Dashboard', href: '/admin/dashboard', icon: Cog6ToothIcon, isPrimaryCTA: false },
+  { name: 'My Schedule', href: '/admin/schedule', icon: CalendarDaysIcon, isPrimaryCTA: false },
+  { name: 'Invite Admin', href: '/admin/invite', icon: UserPlusIcon, isPrimaryCTA: false },
 ];
 
 export default function ProfileLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, loading, logout } = useAuth();
+  const { user, isAdmin, loading, logout } = useAuth(); // Using isAdmin from context
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Combine links based on admin status
+  const profileNavLinks = isAdmin ? [...baseNavLinks, ...adminNavLinks] : baseNavLinks;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -44,7 +51,7 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
   if (loading || !user) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-background text-foreground">
-        Loading profile...
+        Loading...
       </div>
     );
   }
@@ -55,9 +62,9 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
   };
 
   return (
-    <div className={`min-h-screen bg-background text-foreground flex`}>
+    <div className={`bg-background text-foreground flex`}>
       <aside
-        className={`bg-slate-100/80 backdrop-blur-md shadow-lg transition-all duration-300 ease-in-out flex flex-col space-y-4 p-4 
+        className={`min-h-screen bg-slate-100/80 backdrop-blur-md shadow-lg transition-all duration-300 ease-in-out flex flex-col space-y-4 p-4 
                     ${sidebarOpen ? 'w-64' : 'w-20'}`}
       >
         <button 
@@ -76,16 +83,18 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
           <ul className="space-y-2">
             {profileNavLinks.map((item) => {
               const isActive = (pathname && pathname === item.href) || 
-                               (pathname && item.href === '/book' && pathname.startsWith('/book'));
+                               (pathname && item.href === '/book' && pathname.startsWith('/book')) ||
+                               (pathname && item.href === '/admin/dashboard' && pathname.startsWith('/admin/dashboard')) ||
+                               (pathname && item.href === '/admin/schedule' && pathname.startsWith('/admin/schedule')) ||
+                               (pathname && item.href === '/admin/invite' && pathname.startsWith('/admin/invite'));
               
               let linkClasses = `flex items-center space-x-3 p-3 rounded-lg transition-colors duration-150 ${!sidebarOpen ? 'justify-center' : ''}`;
               let iconClasses = `h-6 w-6`;
               let textClasses = `font-medium text-sm font-logo whitespace-nowrap`;
 
               if (item.isPrimaryCTA) {
-                // CTA is always green, slightly brighter on hover/active
                 linkClasses += ' bg-accent-green text-white hover:bg-accent-green/90 shadow-sm';
-                if (isActive) linkClasses += ' ring-2 ring-white/50'; // Active state for CTA
+                if (isActive) linkClasses += ' ring-2 ring-white/50';
                 iconClasses += ' text-white';
               } else {
                 linkClasses += isActive 
@@ -122,7 +131,7 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
         </button>
       </aside>
 
-      <main className="flex-1 p-6 md:p-10 overflow-y-auto">
+      <main className="flex-1 p-6 md:p-10">
         {children}
       </main>
     </div>
