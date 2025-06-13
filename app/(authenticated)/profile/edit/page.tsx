@@ -28,25 +28,25 @@ const ProfileEditPage = () => {
       return;
     }
     
-    const userDocRef = doc(firestore, `users/${user.uid}`);
-    getDoc(userDocRef).then(docSnap => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setFirstName(data.firstName || '');
-        setLastName(data.lastName || '');
-        setHometown(data.hometown || '');
-        setSocialLinks(data.socialLinks || { instagram: '', twitter: '', spotify: '' });
+      const userDocRef = doc(firestore, `users/${user.uid}`);
+      getDoc(userDocRef).then(docSnap => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setFirstName(data.firstName || '');
+          setLastName(data.lastName || '');
+          setHometown(data.hometown || '');
+          setSocialLinks(data.socialLinks || { instagram: '', twitter: '', spotify: '' });
         setProfileImageUrl(data.photoURL || user.photoURL || null);
-      } else {
+        } else {
         const nameParts = user.displayName?.split(' ') || [];
         setFirstName(nameParts[0] || '');
         setLastName(nameParts.slice(1).join(' ') || '');
-        setProfileImageUrl(user.photoURL || null);
-      }
-    }).catch(err => {
-      console.error("Error fetching user profile data:", err);
+          setProfileImageUrl(user.photoURL || null);
+        }
+      }).catch(err => {
+        console.error("Error fetching user profile data:", err);
       setFormError("Could not load your profile data.");
-    });
+      });
   }, [user, loading, router]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,19 +135,19 @@ const ProfileEditPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      <form
-        onSubmit={handleSubmit}
+    <form
+      onSubmit={handleSubmit}
         className="bg-white p-8 rounded-lg shadow-lg w-full max-w-2xl space-y-6"
-      >
+    >
         <h2 className="text-3xl font-bold text-gray-800 text-center">
           Edit Your Profile
-        </h2>
+      </h2>
 
-        {formError && (
+      {formError && (
           <p className="text-red-500 text-center p-3 bg-red-100 rounded-md">
-            {formError}
-          </p>
-        )}
+          {formError}
+        </p>
+      )}
 
         <div className="flex flex-col items-center space-y-4">
           <img
@@ -162,55 +162,55 @@ const ProfileEditPage = () => {
             accept="image/*"
             className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
           />
-          {uploadProgress > 0 && uploadProgress < 100 && (
+        {uploadProgress > 0 && uploadProgress < 100 && (
             <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div
+            <div
                 className="bg-blue-600 h-2.5 rounded-full"
-                style={{ width: `${Math.round(uploadProgress)}%` }}
-              ></div>
-            </div>
-          )}
-        </div>
+              style={{ width: `${Math.round(uploadProgress)}%` }}
+            ></div>
+          </div>
+        )}
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">First Name*</label>
-            <input
-              type="text"
-              id="firstName"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
+          <input
+            type="text"
+            id="firstName"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
               required
               className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
-          </div>
+          />
+        </div>
           <div>
             <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">Last Name*</label>
-            <input
-              type="text"
-              id="lastName"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
+          <input
+            type="text"
+            id="lastName"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
               required
               className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
-          </div>
+          />
         </div>
+      </div>
 
         <div>
           <label htmlFor="hometown" className="block text-sm font-medium text-gray-700">Hometown</label>
-          <input
-            type="text"
-            id="hometown"
-            value={hometown}
-            onChange={(e) => setHometown(e.target.value)}
+        <input
+          type="text"
+          id="hometown"
+          value={hometown}
+          onChange={(e) => setHometown(e.target.value)}
             className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
-        </div>
+        />
+      </div>
 
         <div className="space-y-4">
           <h3 className="text-lg font-medium text-gray-800">Social Links</h3>
-          <div>
+      <div>
             <label htmlFor="instagram" className="block text-sm font-medium text-gray-700">Instagram</label>
             <input
               type="url"
@@ -245,17 +245,17 @@ const ProfileEditPage = () => {
               placeholder="https://open.spotify.com/artist/yourid"
               className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             />
-          </div>
         </div>
+      </div>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
+      <button
+        type="submit"
+        disabled={isSubmitting}
           className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-slate-400"
-        >
+      >
           {isSubmitting ? 'Saving...' : 'Save Profile'}
-        </button>
-      </form>
+      </button>
+    </form>
     </div>
   );
 };

@@ -80,20 +80,30 @@ const AdminDashboard = () => {
   }, [isAdmin]);
 
   const handleUpdateStatus = async (bookingId: string, status: Booking['status']) => {
+    console.log('--- handleUpdateStatus Initiated ---');
+    console.log('Auth loading state:', loading);
+    console.log('Is user admin on client?', isAdmin);
+    console.log('User UID on client:', user?.uid);
+
     if (!isAdmin) {
-      alert('You are not authorized to perform this action.');
+      alert('Client-side check failed: You are not recognized as an admin.');
+      console.log('Update blocked by client-side !isAdmin check.');
       return;
     }
-    if (isUpdating) return; // Prevent multiple updates
+    if (isUpdating) {
+      console.log('Update blocked: another update is already in progress.');
+      return;
+    }
+    
     setIsUpdating(bookingId);
 
     const bookingRef = doc(firestore, 'bookings', bookingId);
     try {
+      console.log(`Attempting to update booking ${bookingId} to status: ${status}`);
       await updateDoc(bookingRef, { status });
-      // No need for success alert, onSnapshot will update the UI
+      console.log('Booking status updated successfully in Firestore.');
     } catch (error) {
-      console.error("Error updating booking status: ", error);
-      // Keep alert for error case as user reported seeing it.
+      console.error("Firestore Error: ", error);
       alert('Failed to update booking status. See console for details.');
     } finally {
       setIsUpdating(null);
@@ -155,7 +165,7 @@ const AdminDashboard = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-start space-x-2">
-                      {booking.status === 'pending' && (
+                    {booking.status === 'pending' && (
                         <>
                           <button 
                             onClick={() => handleUpdateStatus(booking.id, 'confirmed')} 
@@ -170,15 +180,15 @@ const AdminDashboard = () => {
                             {isUpdating === booking.id ? '...' : 'Reject'}
                           </button>
                         </>
-                      )}
-                      {booking.status === 'confirmed' && (
+                    )}
+                     {booking.status === 'confirmed' && (
                         <button 
                           onClick={() => handleUpdateStatus(booking.id, 'completed')} 
                           disabled={isUpdating === booking.id}
                           className="inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-accent-blue hover:bg-accent-blue/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-blue disabled:bg-slate-300 disabled:cursor-not-allowed">
                           {isUpdating === booking.id ? '...' : 'Complete'}
                         </button>
-                      )}
+                    )}
                     </div>
                   </td>
                 </tr>
