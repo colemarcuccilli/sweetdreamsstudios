@@ -1,44 +1,23 @@
 rules_version = '2';
 
-// This is the final, most robust version of the isAdmin function.
-// It explicitly checks for the document's existence before trying to read its data.
+// Checks the user's document in 'users' for isAdmin: true
 function isAdmin() {
-  let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-  return exists(userDocPath) && get(userDocPath).data.isAdmin == true;
+  return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
 }
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Bookings Collection Rules
     match /bookings/{bookingId} {
-      // Allow reading bookings if user is authenticated.
       allow read: if request.auth != null;
-      
-      // Allow user to create a booking if they are logged in and have a user profile.
-      allow create: if request.auth != null 
-                    && request.resource.data.userId == request.auth.uid
-                    && exists(/databases/$(database)/documents/users/$(request.auth.uid));
-      
-      // Allow update if user is the owner (and not changing status) OR if they are an admin.
-      allow update: if request.auth != null &&
-                    ( (resource.data.userId == request.auth.uid && request.resource.data.status == resource.data.status) || isAdmin() );
-
-      // Allow delete if user is the owner OR if they are an admin.
-      allow delete: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
     }
 
-    // Users Collection Rules
     match /users/{userId} {
-      // Any authenticated user can read user profiles.
       allow read: if request.auth != null;
-
-      // A user can write to their own document.
-      // An admin can write to any user document (e.g., to make another user an admin).
-      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null;
     }
-
-    // The 'admins' collection has been removed from the rules.
-    // You can safely delete it from your Firestore database.
   }
-} 
+}
