@@ -7,9 +7,14 @@ import {
     isBefore, isEqual, addMinutes, differenceInMinutes, isAfter, toDate, addDays
 } from 'date-fns';
 import { enUS } from 'date-fns/locale/en-US';
-import { firestore } from '../../../firebase/config';
+import { db as firestore } from '@/lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { httpsCallable } from 'firebase/functions';
+import { functions as firebaseFunctions } from '@/lib/firebase';
+import { User } from 'firebase/auth';
 
 // Define our custom event type
 interface MyCalendarEvent extends BigCalendarEvent {
@@ -173,6 +178,103 @@ const customLocalizer = dateFnsLocalizer({
   getDay,
   locales,
 });
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
+type BookingPaymentFormProps = {
+  selectedSlot: { start: Date; end: Date } | null;
+  services: { [key: string]: boolean };
+  notes: string;
+  clearSelectionStates: () => void;
+  setShowConfirm: (show: boolean) => void;
+  setProducer: (producer: string) => void;
+  setServices: (services: { [key: string]: boolean }) => void;
+  setNotes: (notes: string) => void;
+  user: User | null;
+};
+
+function BookingPaymentForm({ selectedSlot, services, notes, clearSelectionStates, setShowConfirm, setProducer, setServices, setNotes, user }: BookingPaymentFormProps) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmitBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSlot || !user) {
+      setError('Please select a time slot and ensure you are logged in.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. Call backend to create PaymentIntent
+      const createPaymentIntent = httpsCallable(firebaseFunctions, 'createPaymentIntent');
+      const depositAmount = 50; // TODO: Calculate based on session type/duration
+      const bookingId = `${user.uid}_${Date.now()}`; // Temporary ID, replace with Firestore doc ID after creation
+      const paymentIntentRes: any = await createPaymentIntent({ amount: depositAmount, bookingId });
+      const clientSecret = paymentIntentRes.data.clientSecret;
+
+      // 2. Confirm card details with Stripe Elements
+      if (!stripe || !elements) {
+        setError('Stripe is not loaded.');
+        setLoading(false);
+        return;
+      }
+      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: 'if_required',
+      });
+      if (stripeError) {
+        setError(stripeError.message || 'Payment failed.');
+        setLoading(false);
+        return;
+      }
+      // 3. Store booking in Firestore (with paymentIntentId)
+      const bookingData = {
+        userId: user.uid,
+        studioId: 'YOUR_SWEET_DREAMS_PARNELL_STUDIO_ID',
+        engineerId: 'PpzY2fWOt4V4qwHYClGVomHInb82',
+        producerName: 'Jay Valleo',
+        start: Timestamp.fromDate(selectedSlot.start),
+        end: Timestamp.fromDate(selectedSlot.end),
+        selectedServices: Object.entries(services).filter(([, val]) => val).map(([key]) => key),
+        notes,
+        status: 'pending',
+        createdAt: Timestamp.now(),
+        paymentIntentId: paymentIntent.id,
+        depositAmount,
+      };
+      await addDoc(collection(firestore, 'bookings'), bookingData);
+      setShowConfirm(false);
+      alert('Booking request submitted! Your booking is pending confirmation.');
+      clearSelectionStates();
+      setProducer('');
+      setServices({});
+      setNotes('');
+    } catch (error: any) {
+      setError(error.message || 'Failed to submit booking. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmitBooking} className="space-y-4">
+      <PaymentElement />
+      {error && <div className="text-red-500">{error}</div>}
+      <button type="submit" className="btn btn-primary" disabled={loading}>
+        {loading ? 'Processing...' : 'Submit Booking & Pay Deposit'}
+      </button>
+    </form>
+  );
+}
+
+const minCalendarTime = setMinutes(setHours(new Date(1970, 0, 1), 9), 0); // 9:00 AM
+const maxCalendarTime = setMinutes(setHours(new Date(1970, 0, 1), 23), 59); // 11:59 PM
 
 export default function BookPage() {
   const { user } = useAuth();
@@ -372,49 +474,6 @@ export default function BookPage() {
     setServices(prev => ({ ...prev, [serviceId]: !prev[serviceId] }));
   };
 
-  const handleSubmitBooking = async () => {
-    if (!selectedSlot || !user) {
-      setError('Please select a time slot and ensure you are logged in.');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const bookingData = {
-        userId: user.uid,
-        studioId: DEFAULT_STUDIO_ID,
-        engineerId: DEFAULT_ENGINEER_UID,
-        producerName: DEFAULT_PRODUCER_NAME,
-        start: Timestamp.fromDate(selectedSlot.start),
-        end: Timestamp.fromDate(selectedSlot.end),
-        selectedServices: Object.entries(services).filter(([, val]) => val).map(([key]) => key),
-        notes,
-        status: 'pending',
-        createdAt: Timestamp.now(),
-      };
-      await addDoc(collection(firestore, 'bookings'), bookingData);
-      setShowConfirm(false);
-      alert('Booking request submitted! Your booking is pending confirmation.');
-      clearSelectionStates();
-      setProducer('');
-      setServices({});
-      setNotes('');
-    } catch (error) {
-      setError('Failed to submit booking. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const minCalendarTime = setMinutes(setHours(new Date(1970, 0, 1), 9), 0); // 9:00 AM
-  const maxCalendarTime = setMinutes(setHours(new Date(1970, 0, 1), 23), 59); // 11:59 PM
-
-  const handleEventSelection = (event: MyCalendarEvent) => {
-    if (event.isSelection || event.isPendingStart) {
-      clearSelectionStates();
-    }
-  };
-
   const handleWeekChange = (weekStart: Date) => {
     setDate(weekStart);
   };
@@ -581,13 +640,19 @@ export default function BookPage() {
                     className="w-full p-2 border border-foreground/20 rounded-md shadow-sm focus:ring-2 focus:ring-accent-pink/50 focus:border-accent-pink bg-white/80 placeholder:text-foreground/40 text-sm" />
                 </div>
 
-                <button
-                  onClick={() => setShowConfirm(true)}
-                  className="w-full mt-6 py-3 px-4 bg-accent-green text-white font-logo rounded-lg shadow-md hover:bg-accent-green/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-green transition-colors"
-                  disabled={loading}
-                >
-                  Request Booking
-                </button>
+                <Elements stripe={stripePromise} options={{ mode: 'payment' }}>
+                  <BookingPaymentForm
+                    selectedSlot={selectedSlot}
+                    services={services}
+                    notes={notes}
+                    clearSelectionStates={clearSelectionStates}
+                    setShowConfirm={setShowConfirm}
+                    setProducer={setProducer}
+                    setServices={setServices}
+                    setNotes={setNotes}
+                    user={user}
+                  />
+                </Elements>
               </div>
             )}
           </div>
@@ -610,7 +675,6 @@ export default function BookPage() {
             <div className="mb-2">Notes: {notes || 'None'}</div>
             <div className="flex justify-end space-x-2 mt-4">
               <button onClick={() => setShowConfirm(false)} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Cancel</button>
-              <button onClick={handleSubmitBooking} className="px-4 py-2 rounded bg-accent-green text-white hover:bg-accent-green/90" disabled={loading}>Confirm</button>
             </div>
           </div>
         </div>
