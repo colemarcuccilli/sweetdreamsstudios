@@ -449,39 +449,39 @@ const AdminDashboard = () => {
                     </tr>
                   )}
                   {sortedBookings.filter(b => b.status === status).map((booking) => (
-                    <tr key={booking.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-800">
-                        <div>{format(booking.start, 'PPP')}</div>
-                        <div className="text-slate-500">{format(booking.start, 'p')} - {format(booking.end, 'p')}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-800">
-                        <div>{booking.userName}</div>
-                        <div className="text-xs text-slate-500">{booking.userEmail}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{booking.producerName}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                <tr key={booking.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-800">
+                    <div>{format(booking.start, 'PPP')}</div>
+                    <div className="text-slate-500">{format(booking.start, 'p')} - {format(booking.end, 'p')}</div>
+                  </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-800">
+                    <div>{booking.userName}</div>
+                    <div className="text-xs text-slate-500">{booking.userEmail}</div>
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{booking.producerName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                           booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
                           booking.status === 'completed' ? 'bg-blue-100 text-blue-800' :
                           booking.status === 'refunded' ? 'bg-gray-100 text-gray-800' :
                           'bg-slate-100 text-slate-800'
-                        }`}>
-                          {booking.status}
-                        </span>
+                    }`}>
+                      {booking.status}
+                    </span>
                         {booking.paymentIntentId && (
                           <div className="text-xs text-slate-500 mt-1">PI: <a href={`https://dashboard.stripe.com/test/payments/${booking.paymentIntentId}`} target="_blank" rel="noopener noreferrer" className="underline">{booking.paymentIntentId}</a></div>
                         )}
                         {booking.depositCaptured && <div className="text-xs text-green-700">Deposit Captured</div>}
                         {booking.refundStatus && <div className="text-xs text-gray-700">Refund: {booking.refundStatus}</div>}
                         {booking.finalPaymentCaptured && <div className="text-xs text-blue-700">Final Paid</div>}
-                      </td>
+                  </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-start space-x-2">
                           <button onClick={() => setSelectedBookingDetails(booking)} className="text-accent-blue underline">Details</button>
-                          {booking.status === 'pending' && (
-                            <>
+                    {booking.status === 'pending' && (
+                        <>
                               <button
                                 onClick={() => handleUpdateStatus(booking.id, 'confirmed')}
                                 disabled={isUpdating === booking.id}
@@ -494,8 +494,8 @@ const AdminDashboard = () => {
                                 className="inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-600 disabled:bg-slate-300 disabled:cursor-not-allowed">
                                 {isUpdating === booking.id ? '...' : 'Reject'}
                               </button>
-                            </>
-                          )}
+                        </>
+                    )}
                           {booking.status === 'confirmed' && booking.depositCaptured && !booking.refundStatus && (
                             <>
                               <button
@@ -513,14 +513,14 @@ const AdminDashboard = () => {
                             </>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                  </td>
+                </tr>
                   ))}
                 </React.Fragment>
               ))}
               {bookings.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center py-10 text-slate-500">No bookings found.</td>
+                    <td colSpan={5} className="text-center py-10 text-slate-500">No bookings found.</td>
                 </tr>
               )}
             </tbody>

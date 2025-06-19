@@ -8,13 +8,14 @@ import {
 } from 'date-fns';
 import { enUS } from 'date-fns/locale/en-US';
 import { db as firestore } from '@/lib/firebase';
-import { collection, addDoc, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, Timestamp, getDocs } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { httpsCallable } from 'firebase/functions';
 import { functions as firebaseFunctions } from '@/lib/firebase';
 import { User } from 'firebase/auth';
+import { XCircleIcon } from '@heroicons/react/20/solid';
 
 // Define our custom event type
 interface MyCalendarEvent extends BigCalendarEvent {
@@ -31,6 +32,106 @@ const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales
 const studioOpenTime = 9; // 9 AM
 const studioCloseTime = 2; // 2 AM (next day)
 const calendarStep = 30;
+
+// Service Types and Pricing
+interface BaseServiceConfig {
+  label: string;
+  description: string;
+  icon: string;
+}
+
+interface ConsultationServiceConfig extends BaseServiceConfig {
+  duration: number;
+  price: number;
+}
+
+interface HourlyServiceConfig extends BaseServiceConfig {
+  minDuration: number;
+  maxDuration: number;
+  pricing: Array<{ hours: number; price: number }>;
+}
+
+interface PerSongServiceConfig extends BaseServiceConfig {
+  pricePerSong: number;
+  duration: number; // Duration for the consultation
+}
+
+interface ProductionServiceConfig extends BaseServiceConfig {
+  pricePerHour: number;
+  minDuration: number;
+  beatLicenseOptions: typeof BEAT_LICENSE_OPTIONS;
+}
+
+type ServiceConfig = {
+  [SERVICE_TYPES.VIDEO_CONSULT]: ConsultationServiceConfig;
+  [SERVICE_TYPES.BRAND_CONSULT]: ConsultationServiceConfig;
+  [SERVICE_TYPES.HOURLY_SESSION]: HourlyServiceConfig;
+  [SERVICE_TYPES.MIXING_MASTERING]: PerSongServiceConfig;
+  [SERVICE_TYPES.FULL_PRODUCTION]: ProductionServiceConfig;
+};
+
+const SERVICE_TYPES = {
+  VIDEO_CONSULT: 'video-consult',
+  BRAND_CONSULT: 'brand-consult',
+  HOURLY_SESSION: 'hourly-session',
+  MIXING_MASTERING: 'mixing-mastering',
+  FULL_PRODUCTION: 'full-production'
+} as const;
+
+const HOURLY_PRICING = [
+  { hours: 1, price: 50 },
+  { hours: 2, price: 100 },
+  { hours: 3, price: 125 },
+  { hours: 4, price: 170 },
+  { hours: 5, price: 215 },
+  { hours: 6, price: 255 },
+];
+
+const BEAT_LICENSE_OPTIONS = {
+  BASIC_LEASE: { id: 'basic-lease', label: 'Basic Lease', price: 35 },
+  FULL_BUY: { id: 'full-buy', label: 'Full Buy', price: 150 },
+  EXCLUSIVE: { id: 'exclusive', label: 'Exclusive Rights', price: 150, includesRevisions: true }
+} as const;
+
+const SERVICE_CONFIG: ServiceConfig = {
+  [SERVICE_TYPES.VIDEO_CONSULT]: {
+    label: '15-Min Free Video Consultation',
+    duration: 15,
+    price: 0,
+    description: 'Free video consultation to discuss your project and goals.',
+    icon: '🎥'
+  },
+  [SERVICE_TYPES.BRAND_CONSULT]: {
+    label: '15-Min Free Brand Consultation',
+    duration: 15,
+    price: 0,
+    description: 'Free consultation to discuss your brand and marketing strategy.',
+    icon: '💡'
+  },
+  [SERVICE_TYPES.HOURLY_SESSION]: {
+    label: 'Hourly Studio Session',
+    minDuration: 60,
+    maxDuration: 360,
+    pricing: HOURLY_PRICING,
+    description: 'Book studio time for recording, production, or any other needs.',
+    icon: '🎵'
+  },
+  [SERVICE_TYPES.MIXING_MASTERING]: {
+    label: 'Mixing & Mastering',
+    duration: 15, // 15-min consultation
+    pricePerSong: 130,
+    description: 'Professional mixing and mastering services. Includes a 15-minute consultation to discuss your goals. Work is completed independently by the engineer after consultation.',
+    icon: '🎚️'
+  },
+  [SERVICE_TYPES.FULL_PRODUCTION]: {
+    label: 'Full Production Session',
+    pricePerHour: 45,
+    minDuration: 60,
+    description: 'Complete production service with optional beat licensing.',
+    icon: '🎹',
+    beatLicenseOptions: BEAT_LICENSE_OPTIONS
+  }
+} as const;
 
 // --- Helper to get week label ---
 const getWeekLabel = (start: Date) => {
@@ -191,13 +292,64 @@ type BookingPaymentFormProps = {
   setServices: (services: { [key: string]: boolean }) => void;
   setNotes: (notes: string) => void;
   user: User | null;
+  selectedService: string | null;
+  selectedDuration: number;
+  songCount: number;
+  selectedBeatLicense: string | null;
+  isNewCustomer: boolean;
 };
 
-function BookingPaymentForm({ selectedSlot, services, notes, clearSelectionStates, setShowConfirm, setProducer, setServices, setNotes, user }: BookingPaymentFormProps) {
-  const stripe = useStripe();
-  const elements = useElements();
+function BookingPaymentForm({ 
+  selectedSlot, 
+  services, 
+  notes, 
+  clearSelectionStates, 
+  setShowConfirm, 
+  setProducer, 
+  setServices, 
+  setNotes, 
+  user,
+  selectedService,
+  selectedDuration,
+  songCount,
+  selectedBeatLicense,
+  isNewCustomer
+}: BookingPaymentFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+
+  // Calculate total price based on selected service and options
+  const calculateTotalPrice = () => {
+    if (!selectedService) return 0;
+
+    const config = SERVICE_CONFIG[selectedService as keyof typeof SERVICE_CONFIG];
+    let total = 0;
+
+    if ('price' in config) {
+      total = config.price;
+    } else if ('pricePerSong' in config) {
+      total = config.pricePerSong * songCount;
+    } else if ('pricePerHour' in config) {
+      total = config.pricePerHour * (selectedDuration / 60);
+    } else if ('pricing' in config) {
+      const hours = selectedDuration / 60;
+      const pricing = config.pricing.find(p => p.hours === hours);
+      if (pricing) {
+        total = pricing.price;
+      }
+    }
+
+    // Add beat license cost if selected
+    if (selectedBeatLicense && selectedService === SERVICE_TYPES.FULL_PRODUCTION) {
+      const license = Object.values(BEAT_LICENSE_OPTIONS).find(l => l.id === selectedBeatLicense);
+      if (license) {
+        total += license.price;
+      }
+    }
+
+    return total;
+  };
 
   const handleSubmitBooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,76 +357,297 @@ function BookingPaymentForm({ selectedSlot, services, notes, clearSelectionState
       setError('Please select a time slot and ensure you are logged in.');
       return;
     }
+
+    if (!selectedService) {
+      setError('Please select a service.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    try {
-      // 1. Call backend to create PaymentIntent
-      const createPaymentIntent = httpsCallable(firebaseFunctions, 'createPaymentIntent');
-      const depositAmount = 50; // TODO: Calculate based on session type/duration
-      const bookingId = `${user.uid}_${Date.now()}`; // Temporary ID, replace with Firestore doc ID after creation
-      const paymentIntentRes: any = await createPaymentIntent({ amount: depositAmount, bookingId });
-      const clientSecret = paymentIntentRes.data.clientSecret;
 
-      // 2. Confirm card details with Stripe Elements
-      if (!stripe || !elements) {
-        setError('Stripe is not loaded.');
-        setLoading(false);
-        return;
-      }
-      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: window.location.href,
-        },
-        redirect: 'if_required',
-      });
-      if (stripeError) {
-        setError(stripeError.message || 'Payment failed.');
-        setLoading(false);
-        return;
-      }
-      // 3. Store booking in Firestore (with paymentIntentId)
+    try {
+      const config = SERVICE_CONFIG[selectedService as keyof typeof SERVICE_CONFIG];
+      const totalPrice = calculateTotalPrice();
+      
+      // Create the booking object
       const bookingData = {
         userId: user.uid,
-        studioId: 'YOUR_SWEET_DREAMS_PARNELL_STUDIO_ID',
-        engineerId: 'PpzY2fWOt4V4qwHYClGVomHInb82',
-        producerName: 'Jay Valleo',
-        start: Timestamp.fromDate(selectedSlot.start),
-        end: Timestamp.fromDate(selectedSlot.end),
-        selectedServices: Object.entries(services).filter(([, val]) => val).map(([key]) => key),
-        notes,
+        email: user.email,
+        startTime: selectedSlot.start,
+        endTime: selectedSlot.end,
         status: 'pending',
-        createdAt: Timestamp.now(),
-        paymentIntentId: paymentIntent.id,
-        depositAmount,
+        serviceType: selectedService,
+        serviceName: config.label,
+        totalPrice,
+        notes,
+        createdAt: new Date(),
+        ...(songCount && { songCount }),
+        ...(selectedBeatLicense && { beatLicense: selectedBeatLicense }),
+        ...(isNewCustomer && { isNewCustomer: true })
       };
-      await addDoc(collection(firestore, 'bookings'), bookingData);
-      setShowConfirm(false);
-      alert('Booking request submitted! Your booking is pending confirmation.');
+
+      // Add to Firestore
+      const bookingRef = await addDoc(collection(firestore, 'bookings'), bookingData);
+
+      // Clear form and show confirmation
       clearSelectionStates();
-      setProducer('');
-      setServices({});
-      setNotes('');
-    } catch (error: any) {
-      setError(error.message || 'Failed to submit booking. Please try again.');
+      setShowConfirm(true);
+    } catch (err) {
+      console.error('Error creating booking:', err);
+      setError('Failed to create booking. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  // Get service config for display
+  const getServiceConfig = () => {
+    if (!selectedService) return null;
+    return SERVICE_CONFIG[selectedService as keyof typeof SERVICE_CONFIG];
+  };
+
+  const serviceConfig = getServiceConfig();
+
   return (
-    <form onSubmit={handleSubmitBooking} className="space-y-4">
-      <PaymentElement />
-      {error && <div className="text-red-500">{error}</div>}
-      <button type="submit" className="btn btn-primary" disabled={loading}>
-        {loading ? 'Processing...' : 'Submit Booking & Pay Deposit'}
-      </button>
+    <form onSubmit={handleSubmitBooking} className="space-y-6">
+      {/* Booking Summary */}
+      {serviceConfig && (
+        <div className="bg-white p-4 rounded-lg border">
+          <h3 className="font-semibold text-lg mb-3">Booking Summary</h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span>Service:</span>
+              <span>{serviceConfig.label}</span>
+            </div>
+            {selectedDuration > 0 && (
+              <div className="flex justify-between">
+                <span>Duration:</span>
+                <span>{selectedDuration / 60} hour{selectedDuration / 60 > 1 ? 's' : ''}</span>
+              </div>
+            )}
+            {songCount > 0 && (
+              <div className="flex justify-between">
+                <span>Songs:</span>
+                <span>{songCount}</span>
+              </div>
+            )}
+            {selectedBeatLicense && (
+              <div className="flex justify-between">
+                <span>Beat License:</span>
+                <span>{Object.values(BEAT_LICENSE_OPTIONS).find(l => l.id === selectedBeatLicense)?.label}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-semibold text-base pt-2 border-t">
+              <span>Total:</span>
+              <span>${calculateTotalPrice()}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="text-lg font-semibold">
+            Total: ${calculateTotalPrice()}
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !selectedService}
+            className={`inline-flex justify-center rounded-md border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm ${
+              loading || !selectedService
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+            }`}
+          >
+            {loading ? (
+              <>
+                <span className="mr-2">Processing...</span>
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </>
+            ) : (
+              'Book Now'
+            )}
+          </button>
+        </div>
+      </div>
     </form>
   );
 }
 
+// Separate component to use Stripe hooks
+function PaymentFormWithStripe() {
+  const stripe = useStripe();
+  const elements = useElements();
+  
+  return <PaymentElement />;
+}
+
 const minCalendarTime = setMinutes(setHours(new Date(1970, 0, 1), 9), 0); // 9:00 AM
 const maxCalendarTime = setMinutes(setHours(new Date(1970, 0, 1), 23), 59); // 11:59 PM
+
+interface ServiceSelectorProps {
+  selectedService: string | null;
+  onServiceSelect: (serviceType: string) => void;
+  isNewCustomer: boolean;
+  selectedDuration?: number;
+  onDurationChange?: (duration: number) => void;
+  songCount?: number;
+  onSongCountChange?: (count: number) => void;
+  selectedBeatLicense?: string | null;
+  onBeatLicenseSelect?: (licenseType: string | null) => void;
+}
+
+function ServiceSelector({
+  selectedService,
+  onServiceSelect,
+  isNewCustomer,
+  selectedDuration,
+  onDurationChange,
+  songCount,
+  onSongCountChange,
+  selectedBeatLicense,
+  onBeatLicenseSelect
+}: ServiceSelectorProps) {
+  const getServiceConfig = (type: string): ConsultationServiceConfig | HourlyServiceConfig | PerSongServiceConfig | ProductionServiceConfig => {
+    return SERVICE_CONFIG[type as keyof typeof SERVICE_CONFIG];
+  };
+
+  const renderPricing = (config: ConsultationServiceConfig | HourlyServiceConfig | PerSongServiceConfig | ProductionServiceConfig) => {
+    if ('price' in config) {
+      return config.price === 0 ? (
+        <div className="text-green-600 font-medium mt-1">Free</div>
+      ) : null;
+    }
+    if ('pricePerSong' in config) {
+      return <div className="text-gray-700 font-medium mt-1">${config.pricePerSong}/song</div>;
+    }
+    if ('pricePerHour' in config) {
+      return <div className="text-gray-700 font-medium mt-1">${config.pricePerHour}/hour</div>;
+    }
+    if ('pricing' in config) {
+      return <div className="text-gray-700 font-medium mt-1">From ${config.pricing[0].price}</div>;
+    }
+    return null;
+  };
+
+  return (
+    <div className="w-full space-y-4">
+      <div className="flex flex-col space-y-2">
+        <h3 className="text-lg font-semibold">Select Service</h3>
+        {isNewCustomer && (
+          <div className="bg-green-50 p-3 rounded-md text-sm text-green-700 mb-4">
+            🎉 New Customer Bonus: Free 15-minute add-on available!
+          </div>
+        )}
+        
+        <div className="grid grid-cols-1 gap-3">
+          {Object.entries(SERVICE_CONFIG).map(([type, config]) => (
+            <button
+              key={type}
+              onClick={() => onServiceSelect(type)}
+              className={`flex items-center p-4 rounded-lg border ${
+                selectedService === type
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <span className="text-2xl mr-3">{config.icon}</span>
+              <div className="flex-1 text-left">
+                <div className="font-medium">{config.label}</div>
+                <div className="text-sm text-gray-500">{config.description}</div>
+                {renderPricing(config)}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Duration Selector for Hourly Services */}
+      {selectedService && (() => {
+        const config = getServiceConfig(selectedService);
+        return ('pricing' in config || 'pricePerHour' in config) && (
+          <div className="mt-4">
+            <h4 className="text-md font-medium mb-2">Select Duration</h4>
+            <select
+              value={selectedDuration}
+              onChange={(e) => onDurationChange?.(Number(e.target.value))}
+              className="w-full p-2 border rounded-md"
+            >
+              {selectedService === SERVICE_TYPES.FULL_PRODUCTION ? (
+                // Full Production hours (1-8 hours)
+                Array.from({ length: 8 }, (_, i) => (
+                  <option key={i + 1} value={(i + 1) * 60}>
+                    {i + 1} hour{i > 0 ? 's' : ''} (${(i + 1) * 545})
+                  </option>
+                ))
+              ) : (
+                // Regular studio hours with custom pricing
+                SERVICE_CONFIG[SERVICE_TYPES.HOURLY_SESSION].pricing.map(({ hours, price }) => (
+                  <option key={hours} value={hours * 60}>
+                    {hours} hour{hours > 1 ? 's' : ''} (${price})
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+        );
+      })()}
+
+      {/* Song Count Selector for Mixing/Mastering */}
+      {selectedService && (() => {
+        const config = getServiceConfig(selectedService);
+        return 'pricePerSong' in config && (
+          <div className="mt-4">
+            <h4 className="text-md font-medium mb-2">Number of Songs</h4>
+            <select
+              value={songCount}
+              onChange={(e) => onSongCountChange?.(Number(e.target.value))}
+              className="w-full p-2 border rounded-md"
+            >
+              {Array.from({ length: 20 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  {i + 1} song{i > 0 ? 's' : ''} (${(i + 1) * config.pricePerSong})
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      })()}
+
+      {/* Beat License Options for Full Production */}
+      {selectedService === SERVICE_TYPES.FULL_PRODUCTION && (
+        <div className="mt-4">
+          <h4 className="text-md font-medium mb-2">Beat License Options (Optional)</h4>
+          <div className="space-y-2">
+            {Object.values(BEAT_LICENSE_OPTIONS).map((option) => (
+              <button
+                key={option.id}
+                onClick={() => onBeatLicenseSelect?.(
+                  selectedBeatLicense === option.id ? null : option.id
+                )}
+                className={`w-full p-3 text-left rounded-md border ${
+                  selectedBeatLicense === option.id
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium">{option.label}</div>
+                <div className="text-sm text-gray-500">
+                  ${option.price}
+                  {'includesRevisions' in option && option.includesRevisions && ' + Production Revisions'}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function BookPage() {
   const { user } = useAuth();
@@ -291,6 +664,11 @@ export default function BookPage() {
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<MyCalendarEvent | null>(null);
+  const [selectedService, setSelectedService] = useState<string | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<number>(60);
+  const [songCount, setSongCount] = useState<number>(1);
+  const [selectedBeatLicense, setSelectedBeatLicense] = useState<string | null>(null);
+  const [isNewCustomer, setIsNewCustomer] = useState<boolean>(false);
 
   const DEFAULT_STUDIO_ID = 'YOUR_SWEET_DREAMS_PARNELL_STUDIO_ID';
   const DEFAULT_ENGINEER_UID = 'PpzY2fWOt4V4qwHYClGVomHInb82';
@@ -299,13 +677,16 @@ export default function BookPage() {
   const clearSelectionStates = useCallback(() => {
     setPendingStartTime(null);
     setSelectedSlot(null);
+    setProducer('');
+    setServices({});
+    setNotes('');
   }, []);
 
   // Effect to fetch ALL bookings for the main calendar (to show unavailable slots)
   useEffect(() => {
     if (!user) return;
     const bookingsCol = collection(firestore, 'bookings');
-    const q = query(bookingsCol);
+    const q = query(bookingsCol); 
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedBookings: MyCalendarEvent[] = snapshot.docs.map(doc => {
@@ -360,6 +741,26 @@ export default function BookPage() {
     return () => unsubscribe();
   }, [user]);
 
+  // Check if user is a new customer
+  useEffect(() => {
+    const checkNewCustomer = async () => {
+      if (!user?.uid) return;
+      
+      try {
+        const bookingsRef = collection(firestore, 'bookings');
+        const q = query(bookingsRef, where('userId', '==', user.uid));
+        const querySnapshot = await getDocs(q);
+        setIsNewCustomer(querySnapshot.empty);
+      } catch (err) {
+        console.error('Error checking new customer status:', err);
+        // Default to false if there's an error
+        setIsNewCustomer(false);
+      }
+    };
+
+    checkNewCustomer();
+  }, [user?.uid]);
+
   // Combined effect to update the main calendar
   useEffect(() => {
     let currentEvents: MyCalendarEvent[] = [...existingBookings];
@@ -393,6 +794,63 @@ export default function BookPage() {
   const handleSelectSlot = (slotInfo: SlotInfo) => {
     setError(null);
     const { start: clickedCellStartTime, end: clickedCellEndTime } = slotInfo;
+    if (!selectedService) {
+      setError('Please select a service first.');
+      return;
+    }
+
+    // For 15-min services (consultations and mixing/mastering), auto-select 15-min range
+    if (
+      selectedService === SERVICE_TYPES.VIDEO_CONSULT ||
+      selectedService === SERVICE_TYPES.BRAND_CONSULT ||
+      selectedService === SERVICE_TYPES.MIXING_MASTERING
+    ) {
+      const end = addMinutes(clickedCellStartTime, 15);
+      setSelectedSlot({ start: clickedCellStartTime, end });
+      setPendingStartTime(null);
+      setProducer('');
+      setServices({});
+      setNotes('');
+      return;
+    }
+
+    // For hourly services, enforce the selected duration
+    if (selectedService === SERVICE_TYPES.HOURLY_SESSION || selectedService === SERVICE_TYPES.FULL_PRODUCTION) {
+      if (isPast(clickedCellStartTime)) {
+        setError('Cannot book a slot in the past.');
+        clearSelectionStates();
+        return;
+      }
+      
+      const end = addMinutes(clickedCellStartTime, selectedDuration);
+      
+      // Check if the calculated end time is within studio hours
+      if (!isWithinStudioHours(clickedCellStartTime, end)) {
+        setError('Selected duration would extend beyond studio hours.');
+        return;
+      }
+      
+      // Check for conflicts
+      const conflict = existingBookings.find((booking: MyCalendarEvent) => {
+        const bookingStart = booking.start as Date;
+        const bookingEnd = booking.end as Date;
+        return isBefore(clickedCellStartTime, bookingEnd) && isAfter(end, bookingStart);
+      });
+      
+      if (conflict) {
+        setError('This time slot conflicts with an existing booking.');
+        return;
+      }
+      
+      setSelectedSlot({ start: clickedCellStartTime, end });
+      setPendingStartTime(null);
+      setProducer('');
+      setServices({});
+      setNotes('');
+      return;
+    }
+
+    // Legacy range selection logic (should not be reached with current services)
     if (isPast(clickedCellStartTime)) {
       setError('Cannot book a slot in the past.');
       clearSelectionStates();
@@ -511,159 +969,132 @@ export default function BookPage() {
       end: selectedSlot.end,
       isSelection: true,
     });
-  }
+    }
 
   return (
     <div className="space-y-8 p-4 md:p-6">
       <h1 className="text-3xl md:text-4xl font-logo text-accent-green text-center">Book Your Studio Time</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        <div className="lg:col-span-2 bg-slate-50/80 backdrop-blur-sm p-4 md:p-6 rounded-xl shadow-xl">
-          <h2 className="text-2xl font-logo text-accent-blue mb-1">1. Select Date & Time Slot</h2>
-          <p className="text-sm text-foreground/70 mb-4">
-            {pendingStartTime 
-              ? `Start time ${format(pendingStartTime, 'p')} selected. Tap a second slot for end time.` 
-              : 'Tap an available slot for start time, then tap another slot for end time. Min 1 hour.'
-            }
-          </p>
-          <div className="w-full max-w-[1400px] h-[1500px] mx-auto">
-            <Calendar
-              localizer={customLocalizer}
-              events={calendarEvents}
-              startAccessor="start"
-              endAccessor="end"
-              style={{ height: '100%', width: '100%' }}
-              selectable={true}
-              onSelectSlot={handleSelectSlot}
-              onSelectEvent={(event) => setSelectedBooking(event)}
-              defaultView={Views.WEEK}
-              views={[Views.WEEK]}
-              step={60}
-              timeslots={1}
-              min={minCalendarTime}
-              max={maxCalendarTime}
-              date={date}
-              onNavigate={handleNavigate}
-              components={{
-                toolbar: (props) => <CustomToolbar {...props} onWeekChange={handleWeekChange} />,
-              }}
-              eventPropGetter={(event) => {
-                let style: React.CSSProperties = {
-                  backgroundColor: '#fff',
-                  borderColor: '#718096',
-                  color: '#222',
-                };
-                if (event.isMyConfirmed) {
-                  style.backgroundColor = '#22c55e'; // Green for your confirmed
-                  style.borderColor = '#16a34a';
-                  style.color = 'white';
-                } else if (event.isUnavailable && !event.isMyConfirmed) {
-                  style.backgroundColor = '#a0aec0'; // Gray for others' bookings
-                  style.borderColor = '#718096';
-                  style.color = 'white';
-                  style.cursor = 'not-allowed';
-                } else if (event.isSelection) {
-                  style.backgroundColor = '#f59e0b'; // Yellow for selected range
-                  style.borderColor = '#d97706';
-                  style.color = 'black';
-                } else if (event.isPendingStart) {
-                  style.backgroundColor = '#2563eb'; // Blue for pending start
-                  style.borderColor = '#1d4ed8';
-                  style.color = 'white';
-                }
-                return { style };
-              }}
-              popup
+        {/* Service Selection Panel - Always Visible */}
+        <div className="lg:col-span-1">
+          <div className="bg-slate-50/80 backdrop-blur-sm p-4 md:p-6 rounded-xl shadow-xl">
+            <h2 className="text-2xl font-logo text-accent-blue mb-4">1. Select Your Service</h2>
+            <ServiceSelector
+              selectedService={selectedService}
+              onServiceSelect={setSelectedService}
+              isNewCustomer={isNewCustomer}
+              selectedDuration={selectedDuration}
+              onDurationChange={setSelectedDuration}
+              songCount={songCount}
+              onSongCountChange={setSongCount}
+              selectedBeatLicense={selectedBeatLicense}
+              onBeatLicenseSelect={setSelectedBeatLicense}
             />
           </div>
         </div>
 
-        <div className="lg:col-span-1 space-y-6">
-          {/* Booking Form */}
-          <div className="bg-slate-50/80 backdrop-blur-sm p-4 md:p-6 rounded-xl shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-logo text-accent-blue">2. Session Details</h2>
-              {(pendingStartTime || selectedSlot) && (
-                  <button onClick={clearSelectionStates} className="text-xs text-accent-red hover:underline font-medium">
-                      Clear Selection
-                  </button>
-              )}
+        {/* Calendar Panel - Only Visible After Service Selection */}
+        {selectedService && (
+          <div className="lg:col-span-2 bg-slate-50/80 backdrop-blur-sm p-4 md:p-6 rounded-xl shadow-xl">
+            <h2 className="text-2xl font-logo text-accent-blue mb-1">2. Select Date & Time Slot</h2>
+            <p className="text-sm text-foreground/70 mb-4">
+              {selectedService === SERVICE_TYPES.VIDEO_CONSULT || 
+               selectedService === SERVICE_TYPES.BRAND_CONSULT || 
+               selectedService === SERVICE_TYPES.MIXING_MASTERING
+                ? 'Tap any available slot to book your consultation.'
+                : selectedService === SERVICE_TYPES.HOURLY_SESSION || selectedService === SERVICE_TYPES.FULL_PRODUCTION
+                ? `Tap any available slot to book your ${selectedDuration / 60} hour session.`
+                : 'Tap an available slot for start time, then tap another slot for end time.'
+              }
+            </p>
+            <div className="w-full max-w-[1400px] h-[1500px] mx-auto">
+              <Calendar
+                localizer={customLocalizer}
+                events={calendarEvents}
+                startAccessor="start"
+                endAccessor="end"
+                style={{ height: '100%', width: '100%' }}
+                selectable={true}
+                onSelectSlot={handleSelectSlot}
+                onSelectEvent={(event) => setSelectedBooking(event)}
+                defaultView={Views.WEEK}
+                views={[Views.WEEK]}
+                step={60}
+                timeslots={1}
+                min={minCalendarTime} 
+                max={maxCalendarTime}
+                date={date}
+                onNavigate={handleNavigate}
+                components={{
+                  toolbar: (props) => <CustomToolbar {...props} onWeekChange={handleWeekChange} />,
+                }}
+                eventPropGetter={(event) => {
+                  let style: React.CSSProperties = {
+                    backgroundColor: '#fff',
+                    borderColor: '#718096',
+                    color: '#222',
+                  };
+                  if (event.isMyConfirmed) {
+                    style.backgroundColor = '#22c55e';
+                    style.borderColor = '#16a34a';
+                    style.color = 'white';
+                  } else if (event.isUnavailable && !event.isMyConfirmed) {
+                    style.backgroundColor = '#a0aec0';
+                    style.borderColor = '#718096';
+                    style.color = 'white';
+                    style.cursor = 'not-allowed';
+                  } else if (event.isSelection) {
+                    style.backgroundColor = '#f59e0b';
+                    style.borderColor = '#d97706'; 
+                    style.color = 'black';
+                  } else if (event.isPendingStart) {
+                    style.backgroundColor = '#2563eb';
+                    style.borderColor = '#1d4ed8';
+                    style.color = 'white';
+                  }
+                  return { style };
+                }}
+                popup
+              />
             </div>
-            
-            {selectedSlot && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-accent-pink">
-                    Selected Slot:
-                  </h3>
-                  <div className="flex flex-col items-center space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold">Start:</span>
-                      <button onClick={() => adjustSelectedTime('start', -15)} className="px-2 py-1 bg-gray-200 rounded">▲</button>
-                      <span>{format(selectedSlot.start, 'p')}</span>
-                      <button onClick={() => adjustSelectedTime('start', 15)} className="px-2 py-1 bg-gray-200 rounded">▼</button>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold">End:</span>
-                      <button onClick={() => adjustSelectedTime('end', -15)} className="px-2 py-1 bg-gray-200 rounded">▲</button>
-                      <span>{format(selectedSlot.end, 'p')}</span>
-                      <button onClick={() => adjustSelectedTime('end', 15)} className="px-2 py-1 bg-gray-200 rounded">▼</button>
-                    </div>
-                  </div>
-                  <p className="text-foreground/90">Duration: {differenceInMinutes(selectedSlot.end, selectedSlot.start) / 60} hours</p>
-                </div>
-                
-                <div className="space-y-2">
-                  <label htmlFor="producer" className="block text-sm font-medium text-foreground/80">Producer/Engineer:</label>
-                  <p className="w-full p-2 border border-slate-300 rounded-md shadow-sm bg-slate-100 text-foreground/90">
-                    {DEFAULT_PRODUCER_NAME}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground/80">Services Needed:</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {serviceOptions.map(service => (
-                      <div key={service.id} className="flex items-center">
-                        <input type="checkbox" id={service.id} checked={services[service.id] || false} onChange={() => handleServiceChange(service.id)}
-                          className="h-4 w-4 text-accent-pink border-slate-300 rounded focus:ring-accent-pink mr-2" />
-                        <label htmlFor={service.id} className="text-sm text-foreground/90">{service.label}</label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <div>
-                  <label htmlFor="notes" className="block text-lg font-semibold text-foreground/90 mb-1">Additional Notes:</label>
-                  <textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
-                    placeholder='Any specific requests or details for your session?'
-                    className="w-full p-2 border border-foreground/20 rounded-md shadow-sm focus:ring-2 focus:ring-accent-pink/50 focus:border-accent-pink bg-white/80 placeholder:text-foreground/40 text-sm" />
-                </div>
-
-                <Elements stripe={stripePromise} options={{ mode: 'payment' }}>
-                  <BookingPaymentForm
-                    selectedSlot={selectedSlot}
-                    services={services}
-                    notes={notes}
-                    clearSelectionStates={clearSelectionStates}
-                    setShowConfirm={setShowConfirm}
-                    setProducer={setProducer}
-                    setServices={setServices}
-                    setNotes={setNotes}
-                    user={user}
-                  />
-                </Elements>
-              </div>
-            )}
           </div>
-        </div>
+        )}
+
+        {/* Booking Form - Only Visible After Time Selection */}
+        {selectedSlot && (
+          <div className="lg:col-span-1">
+            <div className="bg-slate-50/80 backdrop-blur-sm p-4 md:p-6 rounded-xl shadow-xl">
+              <h2 className="text-2xl font-logo text-accent-blue mb-4">3. Confirm Booking</h2>
+              <BookingPaymentForm
+                selectedSlot={selectedSlot}
+                services={services}
+                notes={notes}
+                clearSelectionStates={clearSelectionStates}
+                setShowConfirm={setShowConfirm}
+                setProducer={setProducer}
+                setServices={setServices}
+                setNotes={setNotes}
+                user={user}
+                selectedService={selectedService}
+                selectedDuration={selectedDuration}
+                songCount={songCount}
+                selectedBeatLicense={selectedBeatLicense}
+                isNewCustomer={isNewCustomer}
+              />
+            </div>
+          </div>
+        )}
       </div>
+
       {error && (
         <div className="text-red-600 font-semibold text-center my-2">{error}</div>
       )}
       {loading && (
         <div className="text-blue-600 font-semibold text-center my-2">Submitting booking...</div>
       )}
+
+      {/* Confirmation Modal */}
       {showConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
@@ -679,6 +1110,8 @@ export default function BookPage() {
           </div>
         </div>
       )}
+
+      {/* Booking Details Modal */}
       {selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
