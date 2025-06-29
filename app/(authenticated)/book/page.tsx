@@ -200,22 +200,27 @@ const CustomToolbar: React.FC<ToolbarProps & { onWeekChange?: (date: Date) => vo
       <div className="relative" ref={dropdownRef}>
         <button
           type="button"
-          className="text-lg font-bold text-gray-800 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm flex items-center"
-          onClick={() => setDropdownOpen(v => !v)}
+          onClick={() => setDropdownOpen(!dropdownOpen)}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 flex items-center space-x-2"
         >
-          {getWeekLabel(date)}
-          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+          <span>{getWeekLabel(date)}</span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </button>
         {dropdownOpen && (
-          <div className="absolute left-0 mt-2 w-56 bg-white border border-gray-300 rounded-md shadow-lg z-10 max-h-80 overflow-y-auto">
-            {weekStarts.map((weekStart, idx) => (
+          <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-300 rounded-md shadow-lg z-10">
+            {weekStarts.map((weekStart, index) => (
               <button
-                key={weekStart.toISOString()}
-                className={`block w-full text-left px-4 py-2 hover:bg-accent-blue/10 ${idx === currentWeekIndex ? 'bg-accent-blue/20 font-bold' : ''}`}
+                key={index}
+                type="button"
                 onClick={() => {
+                  onWeekChange?.(weekStart);
                   setDropdownOpen(false);
-                  if (onWeekChange) onWeekChange(weekStart);
                 }}
+                className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                  index === currentWeekIndex ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                }`}
               >
                 {getWeekLabel(weekStart)}
               </button>
@@ -223,64 +228,30 @@ const CustomToolbar: React.FC<ToolbarProps & { onWeekChange?: (date: Date) => vo
           </div>
         )}
       </div>
-      <div className="flex items-center space-x-2">
-        {(views as string[]).map(viewName => (
-          <button
-            type="button"
-            key={viewName}
-            onClick={() => onView(viewName as any)}
-            className={`px-4 py-2 text-sm font-medium border border-gray-300 rounded-md shadow-sm ${view === viewName ? 'bg-accent-blue text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-          >
-            {viewName.charAt(0).toUpperCase() + viewName.slice(1)}
-          </button>
-        ))}
-      </div>
     </div>
   );
 };
 
-// --- Custom week range for calendar ---
+// Custom week range function
 const getCustomWeekRange = (date: Date) => {
-  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const end = addDays(start, 6);
+  const start = startOfWeek(date, { weekStartsOn: 1 }); // Monday
+  const end = addDays(start, 6); // Sunday
   return { start, end };
 };
 
-// --- Custom week view range for react-big-calendar ---
 const customWeekRange = (date: Date) => {
   const { start, end } = getCustomWeekRange(date);
-  const range = [];
-  let current = start;
-  while (current <= end) {
-    range.push(new Date(current));
-    current = addDays(current, 1);
-  }
-  return range;
+  return {
+    start: setHours(setMinutes(setSeconds(start, 0), 0), studioOpenTime),
+    end: setHours(setMinutes(setSeconds(end, 59), 59), 23)
+  };
 };
 
-// --- Add custom week view config for react-big-calendar ---
-const customWeekView = {
-  range: customWeekRange,
-  title: (date: Date) => {
-    const { start, end } = getCustomWeekRange(date);
-    return `${format(start, 'MMM dd')} - ${format(end, 'MMM dd')}`;
-  },
-};
-
-// --- Patch localizer to force week view to start on today ---
 const customStartOfWeek = () => {
   const today = new Date();
-  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const { start } = getCustomWeekRange(today);
+  return start;
 };
-const customLocalizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: customStartOfWeek,
-  getDay,
-  locales,
-});
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 type BookingPaymentFormProps = {
   selectedSlot: { start: Date; end: Date } | null;
@@ -318,11 +289,12 @@ function BookingPaymentForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
 
-  // Calculate total price based on selected service and options
   const calculateTotalPrice = () => {
     if (!selectedService) return 0;
-
+    
     const config = SERVICE_CONFIG[selectedService as keyof typeof SERVICE_CONFIG];
     let total = 0;
 
@@ -332,26 +304,22 @@ function BookingPaymentForm({
       total = config.pricePerSong * songCount;
     } else if ('pricePerHour' in config) {
       total = config.pricePerHour * (selectedDuration / 60);
+      if (selectedBeatLicense) {
+        const licenseOption = Object.values(BEAT_LICENSE_OPTIONS).find(l => l.id === selectedBeatLicense);
+        if (licenseOption) {
+          total += licenseOption.price;
+        }
+      }
     } else if ('pricing' in config) {
       const hours = selectedDuration / 60;
-      const pricing = config.pricing.find(p => p.hours === hours);
-      if (pricing) {
-        total = pricing.price;
-      }
-    }
-
-    // Add beat license cost if selected
-    if (selectedBeatLicense && selectedService === SERVICE_TYPES.FULL_PRODUCTION) {
-      const license = Object.values(BEAT_LICENSE_OPTIONS).find(l => l.id === selectedBeatLicense);
-      if (license) {
-        total += license.price;
-      }
+      const pricingOption = config.pricing.find(p => p.hours >= hours) || config.pricing[config.pricing.length - 1];
+      total = pricingOption.price;
     }
 
     return total;
   };
 
-  const handleSubmitBooking = async (e: React.FormEvent) => {
+  const handleCreateBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSlot || !user) {
       setError('Please select a time slot and ensure you are logged in.');
@@ -373,7 +341,7 @@ function BookingPaymentForm({
       // Create the booking object
       const bookingData = {
         userId: user.uid,
-        email: user.email,
+        customerEmail: user.email,
         startTime: selectedSlot.start,
         endTime: selectedSlot.end,
         status: 'pending',
@@ -389,13 +357,58 @@ function BookingPaymentForm({
 
       // Add to Firestore
       const bookingRef = await addDoc(collection(firestore, 'bookings'), bookingData);
+      const newBookingId = bookingRef.id;
+      setBookingId(newBookingId);
 
-      // Clear form and show confirmation
-      clearSelectionStates();
-      setShowConfirm(true);
+      // If the service is free, complete the booking immediately
+      if (totalPrice === 0) {
+        clearSelectionStates();
+        setShowConfirm(true);
+        return;
+      }
+
+      // Create PaymentIntent via Cloud Function
+      const createPaymentIntent = httpsCallable(firebaseFunctions, 'createPaymentIntent');
+      const result: any = await createPaymentIntent({
+        amount: totalPrice,
+        bookingId: newBookingId,
+        currency: 'usd'
+      });
+
+      if (result.data.clientSecret) {
+        setClientSecret(result.data.clientSecret);
+        setShowPaymentForm(true);
+      } else {
+        throw new Error('Failed to create payment intent');
+      }
     } catch (err) {
       console.error('Error creating booking:', err);
       setError('Failed to create booking. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientSecret) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // The payment will be processed by Stripe Elements
+      // We just need to update the booking status
+      await firestore.collection('bookings').doc(bookingId!).update({
+        status: 'pending_payment',
+        updatedAt: new Date()
+      });
+
+      clearSelectionStates();
+      setShowConfirm(true);
+    } catch (err) {
+      console.error('Error processing payment:', err);
+      setError('Failed to process payment. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -408,9 +421,43 @@ function BookingPaymentForm({
   };
 
   const serviceConfig = getServiceConfig();
+  const totalPrice = calculateTotalPrice();
+
+  // If we have a client secret, show the Stripe payment form
+  if (showPaymentForm && clientSecret) {
+    const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+    
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-4 rounded-lg border">
+          <h3 className="font-semibold text-lg mb-3">Payment Information</h3>
+          <div className="space-y-2 text-sm mb-4">
+            <div className="flex justify-between">
+              <span>Service:</span>
+              <span>{serviceConfig?.label}</span>
+            </div>
+            <div className="flex justify-between font-semibold text-base pt-2 border-t">
+              <span>Total:</span>
+              <span>${totalPrice}</span>
+            </div>
+          </div>
+          
+          <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <PaymentForm 
+              onSuccess={() => {
+                clearSelectionStates();
+                setShowConfirm(true);
+              }}
+              onError={(error) => setError(error)}
+            />
+          </Elements>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <form onSubmit={handleSubmitBooking} className="space-y-6">
+    <form onSubmit={handleCreateBooking} className="space-y-6">
       {/* Booking Summary */}
       {serviceConfig && (
         <div className="bg-white p-4 rounded-lg border">
@@ -440,7 +487,19 @@ function BookingPaymentForm({
             )}
             <div className="flex justify-between font-semibold text-base pt-2 border-t">
               <span>Total:</span>
-              <span>${calculateTotalPrice()}</span>
+              <span>${totalPrice}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <XCircleIcon className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error</h3>
+              <div className="mt-2 text-sm text-red-700">{error}</div>
             </div>
           </div>
         </div>
@@ -449,7 +508,7 @@ function BookingPaymentForm({
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <div className="text-lg font-semibold">
-            Total: ${calculateTotalPrice()}
+            Total: ${totalPrice}
           </div>
           <button
             type="submit"
@@ -469,7 +528,7 @@ function BookingPaymentForm({
                 </svg>
               </>
             ) : (
-              'Book Now'
+              totalPrice === 0 ? 'Book Free Session' : 'Proceed to Payment'
             )}
           </button>
         </div>
@@ -478,174 +537,48 @@ function BookingPaymentForm({
   );
 }
 
-// Separate component to use Stripe hooks
-function PaymentFormWithStripe() {
+// Stripe Payment Form Component
+function PaymentForm({ onSuccess, onError }: { onSuccess: () => void; onError: (error: string) => void }) {
   const stripe = useStripe();
   const elements = useElements();
-  
-  return <PaymentElement />;
-}
+  const [loading, setLoading] = useState(false);
 
-const minCalendarTime = setMinutes(setHours(new Date(1970, 0, 1), 9), 0); // 9:00 AM
-const maxCalendarTime = setMinutes(setHours(new Date(1970, 0, 1), 23), 59); // 11:59 PM
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-interface ServiceSelectorProps {
-  selectedService: string | null;
-  onServiceSelect: (serviceType: string) => void;
-  isNewCustomer: boolean;
-  selectedDuration?: number;
-  onDurationChange?: (duration: number) => void;
-  songCount?: number;
-  onSongCountChange?: (count: number) => void;
-  selectedBeatLicense?: string | null;
-  onBeatLicenseSelect?: (licenseType: string | null) => void;
-}
+    if (!stripe || !elements) {
+      return;
+    }
 
-function ServiceSelector({
-  selectedService,
-  onServiceSelect,
-  isNewCustomer,
-  selectedDuration,
-  onDurationChange,
-  songCount,
-  onSongCountChange,
-  selectedBeatLicense,
-  onBeatLicenseSelect
-}: ServiceSelectorProps) {
-  const getServiceConfig = (type: string): ConsultationServiceConfig | HourlyServiceConfig | PerSongServiceConfig | ProductionServiceConfig => {
-    return SERVICE_CONFIG[type as keyof typeof SERVICE_CONFIG];
-  };
+    setLoading(true);
 
-  const renderPricing = (config: ConsultationServiceConfig | HourlyServiceConfig | PerSongServiceConfig | ProductionServiceConfig) => {
-    if ('price' in config) {
-      return config.price === 0 ? (
-        <div className="text-green-600 font-medium mt-1">Free</div>
-      ) : null;
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/profile/bookings`,
+      },
+    });
+
+    if (error) {
+      onError(error.message || 'Payment failed');
+    } else {
+      onSuccess();
     }
-    if ('pricePerSong' in config) {
-      return <div className="text-gray-700 font-medium mt-1">${config.pricePerSong}/song</div>;
-    }
-    if ('pricePerHour' in config) {
-      return <div className="text-gray-700 font-medium mt-1">${config.pricePerHour}/hour</div>;
-    }
-    if ('pricing' in config) {
-      return <div className="text-gray-700 font-medium mt-1">From ${config.pricing[0].price}</div>;
-    }
-    return null;
+
+    setLoading(false);
   };
 
   return (
-    <div className="w-full space-y-4">
-      <div className="flex flex-col space-y-2">
-        <h3 className="text-lg font-semibold">Select Service</h3>
-        {isNewCustomer && (
-          <div className="bg-green-50 p-3 rounded-md text-sm text-green-700 mb-4">
-            🎉 New Customer Bonus: Free 15-minute add-on available!
-          </div>
-        )}
-        
-        <div className="grid grid-cols-1 gap-3">
-          {Object.entries(SERVICE_CONFIG).map(([type, config]) => (
-            <button
-              key={type}
-              onClick={() => onServiceSelect(type)}
-              className={`flex items-center p-4 rounded-lg border ${
-                selectedService === type
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <span className="text-2xl mr-3">{config.icon}</span>
-              <div className="flex-1 text-left">
-                <div className="font-medium">{config.label}</div>
-                <div className="text-sm text-gray-500">{config.description}</div>
-                {renderPricing(config)}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Duration Selector for Hourly Services */}
-      {selectedService && (() => {
-        const config = getServiceConfig(selectedService);
-        return ('pricing' in config || 'pricePerHour' in config) && (
-          <div className="mt-4">
-            <h4 className="text-md font-medium mb-2">Select Duration</h4>
-            <select
-              value={selectedDuration}
-              onChange={(e) => onDurationChange?.(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
-            >
-              {selectedService === SERVICE_TYPES.FULL_PRODUCTION ? (
-                // Full Production hours (1-8 hours)
-                Array.from({ length: 8 }, (_, i) => (
-                  <option key={i + 1} value={(i + 1) * 60}>
-                    {i + 1} hour{i > 0 ? 's' : ''} (${(i + 1) * 545})
-                  </option>
-                ))
-              ) : (
-                // Regular studio hours with custom pricing
-                SERVICE_CONFIG[SERVICE_TYPES.HOURLY_SESSION].pricing.map(({ hours, price }) => (
-                  <option key={hours} value={hours * 60}>
-                    {hours} hour{hours > 1 ? 's' : ''} (${price})
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-        );
-      })()}
-
-      {/* Song Count Selector for Mixing/Mastering */}
-      {selectedService && (() => {
-        const config = getServiceConfig(selectedService);
-        return 'pricePerSong' in config && (
-          <div className="mt-4">
-            <h4 className="text-md font-medium mb-2">Number of Songs</h4>
-            <select
-              value={songCount}
-              onChange={(e) => onSongCountChange?.(Number(e.target.value))}
-              className="w-full p-2 border rounded-md"
-            >
-              {Array.from({ length: 20 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {i + 1} song{i > 0 ? 's' : ''} (${(i + 1) * config.pricePerSong})
-                </option>
-              ))}
-            </select>
-          </div>
-        );
-      })()}
-
-      {/* Beat License Options for Full Production */}
-      {selectedService === SERVICE_TYPES.FULL_PRODUCTION && (
-        <div className="mt-4">
-          <h4 className="text-md font-medium mb-2">Beat License Options (Optional)</h4>
-          <div className="space-y-2">
-            {Object.values(BEAT_LICENSE_OPTIONS).map((option) => (
-              <button
-                key={option.id}
-                onClick={() => onBeatLicenseSelect?.(
-                  selectedBeatLicense === option.id ? null : option.id
-                )}
-                className={`w-full p-3 text-left rounded-md border ${
-                  selectedBeatLicense === option.id
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-medium">{option.label}</div>
-                <div className="text-sm text-gray-500">
-                  ${option.price}
-                  {'includesRevisions' in option && option.includesRevisions && ' + Production Revisions'}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    <form onSubmit={handleSubmit}>
+      <PaymentElement />
+      <button
+        type="submit"
+        disabled={!stripe || loading}
+        className="mt-4 w-full inline-flex justify-center rounded-md border border-transparent px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+      >
+        {loading ? 'Processing...' : 'Pay Now'}
+      </button>
+    </form>
   );
 }
 
@@ -996,9 +929,9 @@ export default function BookPage() {
 
         {/* Calendar Panel - Only Visible After Service Selection */}
         {selectedService && (
-          <div className="lg:col-span-2 bg-slate-50/80 backdrop-blur-sm p-4 md:p-6 rounded-xl shadow-xl">
+        <div className="lg:col-span-2 bg-slate-50/80 backdrop-blur-sm p-4 md:p-6 rounded-xl shadow-xl">
             <h2 className="text-2xl font-logo text-accent-blue mb-1">2. Select Date & Time Slot</h2>
-            <p className="text-sm text-foreground/70 mb-4">
+          <p className="text-sm text-foreground/70 mb-4">
               {selectedService === SERVICE_TYPES.VIDEO_CONSULT || 
                selectedService === SERVICE_TYPES.BRAND_CONSULT || 
                selectedService === SERVICE_TYPES.MIXING_MASTERING
@@ -1006,35 +939,35 @@ export default function BookPage() {
                 : selectedService === SERVICE_TYPES.HOURLY_SESSION || selectedService === SERVICE_TYPES.FULL_PRODUCTION
                 ? `Tap any available slot to book your ${selectedDuration / 60} hour session.`
                 : 'Tap an available slot for start time, then tap another slot for end time.'
-              }
-            </p>
+            }
+          </p>
             <div className="w-full max-w-[1400px] h-[1500px] mx-auto">
-              <Calendar
+            <Calendar
                 localizer={customLocalizer}
                 events={calendarEvents}
-                startAccessor="start"
-                endAccessor="end"
+              startAccessor="start"
+              endAccessor="end"
                 style={{ height: '100%', width: '100%' }}
-                selectable={true}
-                onSelectSlot={handleSelectSlot}
+              selectable={true}
+              onSelectSlot={handleSelectSlot}
                 onSelectEvent={(event) => setSelectedBooking(event)}
-                defaultView={Views.WEEK}
+              defaultView={Views.WEEK}
                 views={[Views.WEEK]}
                 step={60}
                 timeslots={1}
-                min={minCalendarTime} 
-                max={maxCalendarTime}
+              min={minCalendarTime} 
+              max={maxCalendarTime}
                 date={date}
                 onNavigate={handleNavigate}
                 components={{
                   toolbar: (props) => <CustomToolbar {...props} onWeekChange={handleWeekChange} />,
                 }}
-                eventPropGetter={(event) => {
-                  let style: React.CSSProperties = {
+              eventPropGetter={(event) => {
+                let style: React.CSSProperties = {
                     backgroundColor: '#fff',
-                    borderColor: '#718096',
+                  borderColor: '#718096',
                     color: '#222',
-                  };
+                };
                   if (event.isMyConfirmed) {
                     style.backgroundColor = '#22c55e';
                     style.borderColor = '#16a34a';
@@ -1042,29 +975,29 @@ export default function BookPage() {
                   } else if (event.isUnavailable && !event.isMyConfirmed) {
                     style.backgroundColor = '#a0aec0';
                     style.borderColor = '#718096';
-                    style.color = 'white';
-                    style.cursor = 'not-allowed';
-                  } else if (event.isSelection) {
-                    style.backgroundColor = '#f59e0b';
-                    style.borderColor = '#d97706'; 
-                    style.color = 'black';
+                  style.color = 'white';
+                  style.cursor = 'not-allowed';
+                } else if (event.isSelection) {
+                  style.backgroundColor = '#f59e0b';
+                  style.borderColor = '#d97706'; 
+                  style.color = 'black';
                   } else if (event.isPendingStart) {
                     style.backgroundColor = '#2563eb';
                     style.borderColor = '#1d4ed8';
                     style.color = 'white';
-                  }
-                  return { style };
-                }}
+                }
+                return { style };
+              }}
                 popup
-              />
-            </div>
+            />
           </div>
+        </div>
         )}
 
         {/* Booking Form - Only Visible After Time Selection */}
         {selectedSlot && (
           <div className="lg:col-span-1">
-            <div className="bg-slate-50/80 backdrop-blur-sm p-4 md:p-6 rounded-xl shadow-xl">
+          <div className="bg-slate-50/80 backdrop-blur-sm p-4 md:p-6 rounded-xl shadow-xl">
               <h2 className="text-2xl font-logo text-accent-blue mb-4">3. Confirm Booking</h2>
               <BookingPaymentForm
                 selectedSlot={selectedSlot}
@@ -1084,9 +1017,9 @@ export default function BookPage() {
               />
             </div>
           </div>
-        )}
-      </div>
-
+              )}
+            </div>
+            
       {error && (
         <div className="text-red-600 font-semibold text-center my-2">{error}</div>
       )}
@@ -1106,9 +1039,9 @@ export default function BookPage() {
             <div className="mb-2">Notes: {notes || 'None'}</div>
             <div className="flex justify-end space-x-2 mt-4">
               <button onClick={() => setShowConfirm(false)} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Cancel</button>
-            </div>
-          </div>
-        </div>
+                      </div>
+                  </div>
+                </div>
       )}
 
       {/* Booking Details Modal */}
