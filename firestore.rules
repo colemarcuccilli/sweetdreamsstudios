@@ -8,50 +8,28 @@ function isAdmin() {
 
 service cloud.firestore {
   match /databases/{database}/documents {
-<<<<<<< HEAD
-    match /bookings/{bookingId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
-    }
-
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-=======
     // Users can read and write their own user document
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       // Admins can read all user documents
-      allow read: if request.auth != null && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow read: if request.auth != null && isAdmin();
     }
     
     // Bookings - users can read their own, admins can read all and update status
     match /bookings/{bookingId} {
-      // Users can read their own bookings
+      // Users can read their own bookings, admins can read all
       allow read: if request.auth != null && 
-        (resource.data.userId == request.auth.uid || 
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true));
+        (resource.data.userId == request.auth.uid || isAdmin());
       
       // Users can create their own bookings
       allow create: if request.auth != null && 
         request.resource.data.userId == request.auth.uid;
       
       // Only admins can update booking status and payment fields
-      allow update: if request.auth != null &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow update: if request.auth != null && isAdmin();
 
       // Only admins can delete bookings
-      allow delete: if request.auth != null && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow delete: if request.auth != null && isAdmin();
     }
->>>>>>> a6a06095f2bc8a4ea34b4a29508a24eebb866704
   }
 }
