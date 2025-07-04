@@ -608,6 +608,7 @@ type _Doc {
   markdown: String!
 }
 
+<<<<<<< HEAD
 "(Internal) Added to things that may be removed from FDC and will soon be no longer usable in schema or operations."
 directive @fdc_deprecated(reason: String = "No longer supported") on
   | SCHEMA
@@ -622,6 +623,8 @@ directive @fdc_deprecated(reason: String = "No longer supported") on
   | INPUT_OBJECT
   | INPUT_FIELD_DEFINITION
 
+=======
+>>>>>>> a6a06095f2bc8a4ea34b4a29508a24eebb866704
 "(Internal) Added to scalars representing quoted CEL expressions."
 directive @fdc_celExpression(
   "The expected CEL type that the expression should evaluate to."
@@ -656,6 +659,18 @@ directive @fdc_oneOf(
   required: Boolean! = false
 ) repeatable on FIELD_DEFINITION | ARGUMENT_DEFINITION | INPUT_FIELD_DEFINITION
 
+<<<<<<< HEAD
+=======
+"""
+The `_Metadata` type is used to return metadata about a field in a response.
+"""
+type _Metadata {
+  # During vector similarity search, the distance between the query vector and
+  # this row's vector. In other cases, this field is not set.
+  distance: Float
+}
+
+>>>>>>> a6a06095f2bc8a4ea34b4a29508a24eebb866704
 type Mutation {
   """
   Run a query during the mutation and add fields into the response.
@@ -2129,6 +2144,7 @@ scalar Vector_Embed_Model
   @fdc_example(value: "textembedding-gecko@001", description: "An older version of the textembedding-gecko model")
   @fdc_example(value: "text-embedding-004", description: "Another text embedding model")
 
+<<<<<<< HEAD
 """
 The `_Metadata` type is used to return metadata about a field in a response.
 """
@@ -2137,4 +2153,7 @@ type _Metadata {
   # this row's vector. In other cases, this field is not set.
   distance: Float
 }
+=======
+# Intentionally left blank.
+>>>>>>> a6a06095f2bc8a4ea34b4a29508a24eebb866704
 

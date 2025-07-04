@@ -8,7 +8,7 @@ import {
   signInWithPopup,
   User
 } from 'firebase/auth';
-import { auth, firestore } from '../../firebase/config';
+import { auth, db as firestore } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import Link from 'next/link';
 

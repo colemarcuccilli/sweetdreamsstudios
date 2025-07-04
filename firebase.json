@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "emulators": {
     "dataconnect": {
       "dataDir": "dataconnect/.dataconnect/pgliteData"
@@ -8,3 +9,21 @@
     "source": "dataconnect"
   }
 }
+=======
+    "emulators": {
+        "dataconnect": {
+            "dataDir": "dataconnect/.dataconnect/pgliteData"
+        }
+    },
+    "dataconnect": {
+        "source": "dataconnect"
+    },
+    "firestore": {
+        "rules": "firestore.rules"
+    },
+    "functions": {
+        "source": "functions",
+        "serviceAccountEmail": "cloud-functions-prod@sweetdreamsstudios-78e71.iam.gserviceaccount.com"
+    }
+}
+>>>>>>> a6a06095f2bc8a4ea34b4a29508a24eebb866704

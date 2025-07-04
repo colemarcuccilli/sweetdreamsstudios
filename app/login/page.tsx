@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase/config'; // Assuming firebase/config.ts is two levels up
+import { auth } from '@/lib/firebase';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');

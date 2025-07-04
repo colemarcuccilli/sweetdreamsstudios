@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+<<<<<<< HEAD
 import { firestore } from '../../../../firebase/config';
+=======
+import { db as firestore } from '@/lib/firebase';
+>>>>>>> a6a06095f2bc8a4ea34b4a29508a24eebb866704
 import { collection, query, where, onSnapshot, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
