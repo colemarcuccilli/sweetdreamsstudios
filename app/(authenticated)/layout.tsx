@@ -25,6 +25,7 @@ const baseNavLinks = [
     icon: BuildingStorefrontIcon, 
     isPrimaryCTA: true,
   },
+  { name: 'My Bookings', href: '/profile/bookings', icon: CalendarDaysIcon },
 ];
 
 const adminNavLinks = [

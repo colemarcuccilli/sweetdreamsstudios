@@ -126,6 +126,13 @@ const AdminDashboard = () => {
     );
   }
 
+  // Sort bookings by status: confirmed, rejected, pending
+  const sortedBookings = [
+    ...bookings.filter(b => b.status === 'confirmed'),
+    ...bookings.filter(b => b.status === 'rejected'),
+    ...bookings.filter(b => b.status === 'pending'),
+  ];
+
   return (
     <div className="p-4 md:p-8 space-y-6">
       <h1 className="text-3xl md:text-4xl font-logo text-accent-green">Admin Dashboard</h1>
@@ -143,58 +150,63 @@ const AdminDashboard = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
-              {bookings.length > 0 ? bookings.map((booking) => (
-                <tr key={booking.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-800">
-                    <div>{format(booking.start, 'PPP')}</div>
-                    <div className="text-slate-500">{format(booking.start, 'p')} - {format(booking.end, 'p')}</div>
-                  </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-800">
-                    <div>{booking.userName}</div>
-                    <div className="text-xs text-slate-500">{booking.userEmail}</div>
-                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{booking.producerName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                        booking.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-800'
-                    }`}>
-                      {booking.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-start space-x-2">
-                    {booking.status === 'pending' && (
-                        <>
-                          <button 
-                            onClick={() => handleUpdateStatus(booking.id, 'confirmed')} 
-                            disabled={isUpdating === booking.id}
-                            className="inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-accent-green hover:bg-accent-green/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-green disabled:bg-slate-300 disabled:cursor-not-allowed">
-                            {isUpdating === booking.id ? '...' : 'Confirm'}
-                          </button>
-                          <button 
-                            onClick={() => handleUpdateStatus(booking.id, 'rejected')} 
-                            disabled={isUpdating === booking.id}
-                            className="inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-accent-red hover:bg-accent-red/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-red disabled:bg-slate-300 disabled:cursor-not-allowed">
-                            {isUpdating === booking.id ? '...' : 'Reject'}
-                          </button>
-                        </>
-                    )}
-                     {booking.status === 'confirmed' && (
-                        <button 
-                          onClick={() => handleUpdateStatus(booking.id, 'completed')} 
-                          disabled={isUpdating === booking.id}
-                          className="inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-accent-blue hover:bg-accent-blue/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-blue disabled:bg-slate-300 disabled:cursor-not-allowed">
-                          {isUpdating === booking.id ? '...' : 'Complete'}
-                        </button>
-                    )}
-                    </div>
-                  </td>
-                </tr>
-              )) : (
+              {/* Grouped by status with headers */}
+              {['confirmed', 'rejected', 'pending'].map(status => (
+                <React.Fragment key={status}>
+                  {sortedBookings.filter(b => b.status === status).length > 0 && (
+                    <tr>
+                      <td colSpan={5} className={`py-2 px-6 text-left font-bold text-lg ${
+                        status === 'confirmed' ? 'text-green-700' : status === 'rejected' ? 'text-red-700' : 'text-yellow-700'
+                      } bg-slate-50`}>{status.charAt(0).toUpperCase() + status.slice(1)} Bookings</td>
+                    </tr>
+                  )}
+                  {sortedBookings.filter(b => b.status === status).map((booking) => (
+                    <tr key={booking.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-800">
+                        <div>{format(booking.start, 'PPP')}</div>
+                        <div className="text-slate-500">{format(booking.start, 'p')} - {format(booking.end, 'p')}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-800">
+                        <div>{booking.userName}</div>
+                        <div className="text-xs text-slate-500">{booking.userEmail}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{booking.producerName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                          booking.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-800'
+                        }`}>
+                          {booking.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-start space-x-2">
+                          {booking.status === 'pending' && (
+                            <>
+                              <button
+                                onClick={() => handleUpdateStatus(booking.id, 'confirmed')}
+                                disabled={isUpdating === booking.id}
+                                className="inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-accent-green hover:bg-accent-green/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-green disabled:bg-slate-300 disabled:cursor-not-allowed">
+                                {isUpdating === booking.id ? '...' : 'Confirm'}
+                              </button>
+                              <button
+                                onClick={() => handleUpdateStatus(booking.id, 'rejected')}
+                                disabled={isUpdating === booking.id}
+                                className="inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-600 disabled:bg-slate-300 disabled:cursor-not-allowed">
+                                {isUpdating === booking.id ? '...' : 'Reject'}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
+              ))}
+              {bookings.length === 0 && (
                 <tr>
-                    <td colSpan={5} className="text-center py-10 text-slate-500">No bookings found.</td>
+                  <td colSpan={5} className="text-center py-10 text-slate-500">No bookings found.</td>
                 </tr>
               )}
             </tbody>
