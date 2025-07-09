@@ -1,36 +1,72 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Node dependencies
+node_modules/
+**/node_modules/
+/.pnp/
+/.pnp.js
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Build outputs
+.next/
+**/.next/
+out/
+build/
 
-# testing
-/coverage
+# Test coverage
+/coverage/
 
-# next.js
-/.next/
-/out/
+# Log files
+/logs/
+/npm-debug.log*
+/yarn-debug.log*
+/yarn-error.log*
+*.log
 
-# production
-/build
+# Environment files
+/.env
+/.env.*.local
+.env.local
 
-# misc
+# Vercel
+/.vercel/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Miscellaneous
 .DS_Store
 *.pem
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Editor directories and files
+/.idea/
+/.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# local env files
-.env*.local
-.env
+# Task files
+/tasks.json
+/tasks/
 
-# vercel
-.vercel
+# Firebase
+/functions/lib/
+/functions/node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+
+# Large media files (use Git LFS or external storage)
+*.webm
+*.mp4
+*.mov
+*.avi
+*.mkv
+public/videos/
