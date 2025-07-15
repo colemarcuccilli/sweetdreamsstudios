@@ -43,6 +43,7 @@ interface ScheduleEvent extends BigCalendarEvent {
   finalPaid?: boolean;
   notes?: string;
   paymentHistory?: any[];
+  sessionFiles?: string[];
 }
 
 // Custom week range for calendar: always today + next 6 days
@@ -280,7 +281,7 @@ function BookingDetailsModal({
       }
 
       // If there's a remaining balance, create a checkout session for final payment
-      if (remainingBalance > 0) {
+      if (remainingBalance > 0 && booking.userId) {
         try {
           // Create checkout session for remaining balance using Stripe extension
           const checkoutSessionRef = await addDoc(

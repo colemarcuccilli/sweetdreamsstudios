@@ -1,6 +1,91 @@
-# sweetdreamsstudios
+# Sweet Dreams Studios
 
-Stack Plan
+> **Status**: Stripe Integration Implementation Phase  
+> **Last Updated**: January 15, 2025  
+> **Current Focus**: Resolving Stripe payment integration using Stripe CLI approach
+
+## Quick Links
+- [📊 Stripe Integration Report](./STRIPE_INTEGRATION_REPORT.md) - Comprehensive technical status and troubleshooting
+- [📝 Development Log](./CLAUDE.md) - Session history and development notes
+
+## Project Overview
+Sweet Dreams Studios is a sophisticated music production booking platform built with Next.js 14, featuring Firebase backend integration, Stripe payment processing, and advanced UI animations. The platform serves as both a business showcase and functional booking system for music production services.
+
+## Current Status: Payment Integration Phase
+
+### ✅ Completed Features
+- **Service-First Booking Flow**: Users select service before calendar scheduling
+- **Admin Dashboard**: Complete booking management with payment controls
+- **User Authentication**: Firebase Auth with Google OAuth integration
+- **Dynamic Services**: Database-driven service management (moved from hardcoded)
+- **Real-time Updates**: Live booking status changes via Firestore
+- **File Management**: Firebase Storage integration for project files
+
+### 🔄 In Progress
+- **Stripe Payment Integration**: Implementing hybrid approach (Extension + Cloud Functions)
+- **Immediate Payment Flow**: Deposit collection during booking (before admin review)
+- **Custom Invoice System**: Admin-managed final payment processing
+
+### 📋 Next Phase: Complete Website
+After payment integration completion:
+1. Studio page with detailed facility information
+2. Videography portfolio and service pages
+3. Branding/development service showcase
+4. Contact page with integrated booking
+5. AI Dream Suite for artist career development
+
+## Tech Stack
+
+### Frontend
+- **Next.js 14** with App Router architecture
+- **React 18** with TypeScript
+- **Tailwind CSS** with custom design system
+- **Framer Motion** for animations
+- **GSAP** with ScrollTrigger for scroll-based animations
+- **React Big Calendar** for booking interface
+- **Headless UI** for accessible components
+
+### Backend & Services
+- **Firebase Suite**: Auth, Firestore, Functions, Storage
+- **Stripe** for payment processing (Extension + Custom Functions)
+- **Date-fns** for date manipulation
+
+### Development Tools
+- **TypeScript**, **ESLint**, **Prettier**
+- **PostCSS**, **Autoprefixer**
+- **Firebase CLI**
+
+## Architecture Overview
+
+### Booking System Flow
+```
+User Selects Service → Calendar Booking → Immediate Payment → Admin Review → Session → Final Payment
+```
+
+### Database Collections
+- `users` - User profiles with admin flags
+- `services` - Dynamic service definitions and pricing
+- `booking_requests` - Booking requests with payment tracking
+- `bookings` - Confirmed bookings
+- `customers` - Stripe customer data
+- `pricingRules` - Service pricing configurations
+
+### Authentication & Security
+- Firebase Auth with Google OAuth
+- Role-based access control (admin/user)
+- Firestore security rules with Cloud Functions access
+- Protected routes with automatic redirects
+
+## Development Guidelines
+
+### Critical Rules
+1. **DO NOT BREAK EXISTING FUNCTIONALITY** - Service-first booking flow is working
+2. **PRESERVE AUTHENTICATION** - User auth system is stable
+3. **MAINTAIN ADMIN DASHBOARD** - Booking management is fully functional
+4. **KEEP DATABASE SERVICES** - Dynamic service loading is implemented
+
+## Original Project Vision
+
 I. Core Functionality (Available to All Users):
 User Accounts & Profiles:
 Firebase Authentication: Secure user registration, login, and profile management.

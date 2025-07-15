@@ -10,10 +10,9 @@ import { enUS } from 'date-fns/locale/en-US';
 import { db as firestore } from '@/lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, Timestamp, getDocs, doc as firestoreDoc, updateDoc, doc } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+// Remove Stripe frontend imports - we'll use the hybrid approach instead
 import { httpsCallable } from 'firebase/functions';
-import { functions as firebaseFunctions } from '@/lib/firebase';
+import { functions as firebaseFunctions, auth as firebaseAuth } from '@/lib/firebase';
 import { User } from 'firebase/auth';
 import { XCircleIcon } from '@heroicons/react/20/solid';
 import ServiceSelector from '@/components/ServiceSelector';
@@ -29,6 +28,9 @@ interface MyCalendarEvent extends BigCalendarEvent {
 
 const locales = { 'en-US': enUS };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
+
+// Initialize Stripe once outside of components
+// Removed Stripe Promise - using hybrid approach with Cloud Functions
 
 const studioOpenTime = 9; // 9 AM
 const studioCloseTime = 2; // 2 AM (next day)
@@ -270,6 +272,7 @@ type BookingPaymentFormProps = {
   selectedSlot: { start: Date; end: Date } | null;
   services: { [key: string]: boolean };
   notes: string;
+  producer: string;
   clearSelectionStates: () => void;
   setShowConfirm: (show: boolean) => void;
   setProducer: (producer: string) => void;
@@ -282,15 +285,13 @@ type BookingPaymentFormProps = {
   songCount: number;
   selectedBeatLicense: string | null;
   isNewCustomer: boolean;
-  setBookingData: (data: any) => void;
-  setDepositAmount: (amount: number) => void;
-  setShowPaymentForm: (show: boolean) => void;
 };
 
 function BookingPaymentForm({ 
   selectedSlot, 
   services, 
   notes, 
+  producer,
   clearSelectionStates, 
   setShowConfirm, 
   setProducer, 
@@ -302,14 +303,10 @@ function BookingPaymentForm({
   selectedDuration,
   songCount,
   selectedBeatLicense,
-  isNewCustomer,
-  setBookingData,
-  setDepositAmount,
-  setShowPaymentForm
+  isNewCustomer
 }: BookingPaymentFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
 
   const calculateTotalPrice = () => {
@@ -410,16 +407,128 @@ function BookingPaymentForm({
         return;
       }
 
-      // For paid services, store booking data and show payment form
-      const calculatedDepositAmount = Math.max(totalPrice * 0.5, 25); // 50% deposit or $25 minimum
-      
-      console.log('Setting up payment form for amount:', calculatedDepositAmount);
-      console.log('Booking data to store:', newBookingData);
-      
-      // Store booking data temporarily - don't create booking until payment succeeds
-      setBookingData(newBookingData);
-      setDepositAmount(calculatedDepositAmount);
-      setShowPaymentForm(true);
+      // Submit booking request using new hybrid approach
+      try {
+        console.log('Submitting booking request...');
+        console.log('User:', user);
+        console.log('User UID:', user?.uid);
+        
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
+        // Ensure user has valid token and check auth instance
+        try {
+          const token = await user.getIdToken();
+          console.log('User token obtained:', !!token);
+          console.log('Current user in auth instance:', firebaseAuth.currentUser?.uid);
+          console.log('User from context:', user.uid);
+          
+          // Ensure auth instance has the current user
+          if (!firebaseAuth.currentUser || firebaseAuth.currentUser.uid !== user.uid) {
+            console.warn('Auth instance user mismatch, forcing refresh...');
+            await user.getIdToken(true); // Force refresh
+          }
+        } catch (tokenError) {
+          console.error('Error getting user token:', tokenError);
+          throw new Error('Unable to get authentication token');
+        }
+        
+        const submitBookingFunction = httpsCallable(firebaseFunctions, 'submitBookingRequest');
+        
+        console.log('Firebase Functions instance:', firebaseFunctions);
+        console.log('About to call function with data...');
+        
+        // Try calling function manually with fetch to debug
+        try {
+          console.log('Testing with manual fetch...');
+          const token = await user.getIdToken(true);
+          console.log('Token for manual call:', token.substring(0, 20) + '...');
+          
+          const response = await fetch('https://us-central1-sweetdreamsstudios-7c965.cloudfunctions.net/testAuth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ data: {} })
+          });
+          
+          const result = await response.text();
+          console.log('Manual fetch response:', response.status, result);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${result}`);
+          }
+        } catch (manualError) {
+          console.error('Manual fetch failed:', manualError);
+        }
+        
+        // Test authentication with httpsCallable
+        try {
+          console.log('Testing authentication with testAuth function...');
+          
+          // Force refresh token to ensure it's valid
+          const freshToken = await user.getIdToken(true);
+          console.log('Fresh token obtained:', !!freshToken);
+          
+          const testAuthFunction = httpsCallable(firebaseFunctions, 'testAuth');
+          const testResult = await testAuthFunction({});
+          console.log('testAuth result:', testResult.data);
+        } catch (testError) {
+          console.error('testAuth failed:', testError);
+          console.error('testError details:', testError);
+          throw new Error(`Authentication test failed: ${testError.message}`);
+        }
+        
+        const result = await submitBookingFunction({
+          resourceId: 'studio-1', // Default studio ID
+          requestedStartTime: selectedSlot.start.toISOString(),
+          requestedEndTime: selectedSlot.end.toISOString(),
+          durationHours: (selectedSlot.end.getTime() - selectedSlot.start.getTime()) / (1000 * 60 * 60),
+          serviceType: selectedServiceData.serviceType || selectedServiceData.id || selectedServiceData.name,
+          serviceDetailsInput: {
+            producer: producer,
+            ...services,
+            notes: notes,
+            songCount: songCount,
+            selectedBeatLicense: selectedBeatLicense,
+            isNewCustomer: isNewCustomer
+          },
+          clientNotes: notes,
+          clientName: user?.displayName || user?.email || 'Unknown',
+          clientEmail: user?.email || '',
+          clientPhone: '', // You might want to collect this in the form
+          returnUrl: `${window.location.origin}/booking-success`
+        });
+
+        console.log('Booking request submitted:', result.data);
+        
+        if (result.data.success && result.data.checkoutUrl) {
+          // Show payment summary before redirecting
+          const confirmed = confirm(`Booking Details:
+Total Cost: $${result.data.totalCost}
+Deposit Required: $${result.data.depositAmount}
+Remaining Balance: $${result.data.remainingBalance}
+
+You'll be redirected to pay the deposit. The remaining balance will be charged after your session.
+
+Continue to payment?`);
+          
+          if (confirmed) {
+            // Redirect to Stripe checkout for immediate payment
+            window.location.href = result.data.checkoutUrl;
+          } else {
+            // User cancelled, might want to delete the booking request
+            setError('Booking cancelled. Payment is required to reserve your session.');
+          }
+        } else {
+          throw new Error('Failed to create booking request');
+        }
+      } catch (error: any) {
+        console.error('Error submitting booking request:', error);
+        setError(`Failed to submit booking request: ${error.message}`);
+      }
     } catch (err) {
       console.error('Error creating booking:', err);
       setError('Failed to create booking. Please try again.');
@@ -431,53 +540,7 @@ function BookingPaymentForm({
   // Use selectedServiceData for display
   const totalPrice = calculateTotalPrice();
 
-  // If we should show payment form, show it
-  if (showPaymentForm && bookingData) {
-    const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-    
-    return (
-      <div className="space-y-6">
-        <div className="bg-white p-4 rounded-lg border">
-          <h3 className="font-semibold text-lg mb-3">Payment Information</h3>
-          <div className="space-y-2 text-sm mb-4">
-            <div className="flex justify-between">
-              <span>Service:</span>
-              <span>{selectedServiceData?.name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Total Service Cost:</span>
-              <span>${totalPrice}</span>
-            </div>
-            <div className="flex justify-between font-semibold text-accent-blue border-t pt-2">
-              <span>Deposit Required:</span>
-              <span>${Math.max(totalPrice * 0.5, 25)}</span>
-            </div>
-            <div className="flex justify-between text-xs text-slate-500">
-              <span>Remaining balance due after session:</span>
-              <span>${totalPrice - Math.max(totalPrice * 0.5, 25)}</span>
-            </div>
-          </div>
-          
-          <Elements stripe={stripePromise}>
-            <PaymentForm 
-              amount={depositAmount}
-              bookingData={bookingData}
-              onSuccess={(newBookingId) => {
-                setBookingId(newBookingId);
-                clearSelectionStates();
-                setShowConfirm(true);
-                setShowPaymentForm(false);
-              }}
-              onError={(error) => {
-                setError(error);
-                setShowPaymentForm(false);
-              }}
-            />
-          </Elements>
-        </div>
-      </div>
-    );
-  }
+  // Removed payment form - using hybrid approach with booking requests
 
   return (
     <form onSubmit={handleCreateBooking} className="space-y-6">
@@ -594,151 +657,7 @@ function BookingPaymentForm({
   );
 }
 
-// Stripe Payment Form Component
-function PaymentForm({ 
-  onSuccess, 
-  onError, 
-  amount, 
-  bookingData 
-}: { 
-  onSuccess: (bookingId: string) => void; 
-  onError: (error: string) => void;
-  amount: number;
-  bookingData: any;
-}) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [loading, setLoading] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const { user } = useAuth();
-
-  useEffect(() => {
-    // Create payment intent directly with your Stripe publishable key
-    const createPaymentIntent = async () => {
-      try {
-        console.log('Creating payment intent for amount:', amount);
-        const response = await fetch('/api/create-payment-intent', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            amount: amount * 100, // Convert to cents
-            currency: 'usd',
-            metadata: {
-              userId: user?.uid,
-              paymentType: 'deposit',
-              serviceName: bookingData?.serviceName || 'Session'
-            }
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to create payment intent');
-        }
-
-        const { client_secret } = await response.json();
-        console.log('Payment intent created successfully:', client_secret);
-        setClientSecret(client_secret);
-      } catch (error) {
-        console.error('Error creating payment intent:', error);
-        onError('Failed to initialize payment. Please try again.');
-      }
-    };
-
-    if (user && amount > 0) {
-      console.log('Creating payment intent with user:', user.uid, 'amount:', amount);
-      createPaymentIntent();
-    }
-  }, [amount, bookingData, user, onError]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!stripe || !elements || !clientSecret) {
-      return;
-    }
-
-    setLoading(true);
-
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      clientSecret,
-      confirmParams: {
-        return_url: `${window.location.origin}/profile/bookings?success=true`,
-      },
-      redirect: 'if_required'
-    });
-
-    if (error) {
-      onError(error.message || 'Payment failed');
-    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-      // Create booking after successful payment
-      try {
-        const finalBookingData = {
-          ...bookingData,
-          status: 'pending_confirmation',
-          depositPaid: true,
-          depositCaptured: true,
-          depositCapturedAt: new Date(),
-          paymentIntentId: paymentIntent.id,
-          depositAmount: amount,
-          updatedAt: new Date()
-        };
-        
-        const bookingRef = await addDoc(collection(firestore, 'bookings'), finalBookingData);
-        onSuccess(bookingRef.id);
-      } catch (firestoreError) {
-        console.error('Error creating booking after payment:', firestoreError);
-        onError('Payment succeeded but failed to create booking. Please contact support.');
-      }
-    } else {
-      onError('Payment was not completed successfully');
-    }
-
-    setLoading(false);
-  };
-
-  if (!clientSecret) {
-    return (
-      <div className="flex justify-center items-center p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-blue mx-auto mb-4"></div>
-          <p>Setting up payment...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
-        <PaymentElement />
-      </div>
-      <button
-        type="submit"
-        disabled={!stripe || loading}
-        className={`w-full py-4 px-6 rounded-lg font-semibold text-lg transition-all duration-200 ${
-          !stripe || loading
-            ? 'bg-gray-400 cursor-not-allowed text-white'
-            : 'bg-gradient-to-r from-accent-green to-accent-blue text-white hover:shadow-lg transform hover:-translate-y-0.5'
-        }`}
-      >
-        {loading ? (
-          <div className="flex items-center justify-center">
-            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Processing Payment...
-          </div>
-        ) : (
-          `Pay $${amount} Deposit`
-        )}
-      </button>
-    </form>
-  );
-}
+// Removed PaymentForm component - using hybrid approach with booking requests instead
 
 export default function BookPage() {
   const { user } = useAuth();
@@ -766,9 +685,7 @@ export default function BookPage() {
   const [songCount, setSongCount] = useState<number>(1);
   const [selectedBeatLicense, setSelectedBeatLicense] = useState<string | null>(null);
   const [isNewCustomer, setIsNewCustomer] = useState<boolean>(false);
-  const [bookingData, setBookingData] = useState<any>(null);
-  const [depositAmount, setDepositAmount] = useState<number>(0);
-  const [showPaymentForm, setShowPaymentForm] = useState<boolean>(false);
+  // Removed payment-related state - using hybrid approach
 
   const DEFAULT_STUDIO_ID = 'YOUR_SWEET_DREAMS_PARNELL_STUDIO_ID';
   const DEFAULT_ENGINEER_UID = 'PpzY2fWOt4V4qwHYClGVomHInb82';
@@ -1142,6 +1059,7 @@ export default function BookPage() {
                 selectedSlot={selectedSlot}
                 services={services}
                 notes={notes}
+                producer={producer}
                 clearSelectionStates={clearSelectionStates}
                 setShowConfirm={setShowConfirm}
                 setProducer={setProducer}
@@ -1154,9 +1072,6 @@ export default function BookPage() {
                 songCount={songCount}
                 selectedBeatLicense={selectedBeatLicense}
                 isNewCustomer={isNewCustomer}
-                setBookingData={setBookingData}
-                setDepositAmount={setDepositAmount}
-                setShowPaymentForm={setShowPaymentForm}
               />
             </div>
           </div>
