@@ -224,6 +224,7 @@ export const submitBookingRequestWithPaymentAuth = functions.https.onCall(async 
       capture_method: 'manual', // Critical: Manual capture for admin approval
       setup_future_usage: 'off_session', // To re-use payment method for final charge
       confirm: true,
+      payment_method_types: ['card'], // Only allow card payments to avoid redirects
       metadata: {
         bookingRequestId: mockBookingRequestId,
         serviceType: serviceType,

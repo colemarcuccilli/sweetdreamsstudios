@@ -308,54 +308,114 @@ STRIPE_SECRET_KEY
 - ✅ Added proper IAM roles to Firebase Admin SDK service account
 - ✅ Simplified pricing logic to remove dependency on service collection
 
-#### **Current Status - Still Blocked**
-- **Error Persists**: `7 PERMISSION_DENIED: Missing or insufficient permissions`
-- **Location**: Any Firestore operation in Cloud Functions
-- **Service Account**: Firebase Admin SDK service account has all necessary roles
-- **Rules**: Firestore rules are completely permissive for debugging
+#### **BREAKTHROUGH: Node.js Version Fix Resolved PERMISSION_DENIED**
+- **MAJOR SUCCESS**: ✅ **RESOLVED** - Upgrading Node.js version from v18.19.1 to v22.13.1 and reinstalling Firebase CLI completely eliminated the PERMISSION_DENIED error
+- **Root Cause**: Firebase CLI v14.10.1 was internally using Node v18, which had compatibility issues with Firebase Admin SDK authentication
+- **Solution Steps**:
+  1. Verified Node.js v22.13.1 was installed: `node --version`
+  2. Uninstalled Firebase CLI: `npm uninstall -g firebase-tools`
+  3. Reinstalled Firebase CLI: `npm install -g firebase-tools@latest`
+  4. This resolved ALL Firestore permission issues immediately
 
-#### **Next Steps - Remaining Hypotheses**
+#### **New Challenge: Stripe Configuration Issues**
+After resolving the core permission problem, we encountered Stripe-specific configuration errors:
 
-##### **1. Service Account Impersonation Issue**
-- Cloud Functions may still be trying to use compute service account despite Admin SDK initialization
-- **Action Needed**: Verify which service account is actually being used at runtime
+##### **Error**: PaymentIntent Redirect Configuration
+- **Problem**: `This PaymentIntent is configured to accept payment methods enabled in your Dashboard. Because some of these payment methods might redirect your customer off of your page, you must provide a 'return_url'`
+- **Root Cause**: Stripe dashboard has payment methods enabled that require redirects (like certain bank transfers, BNPL methods)
+- **Attempted Solutions**:
+  1. ❌ **FAILED**: Added `automatic_payment_methods: { enabled: true, allow_redirects: 'never' }` - Conflicted with explicit `payment_method` parameter
+  2. ❌ **FAILED**: Replaced with `payment_method_types: ['card']` - Still getting same error after deployment
+  3. **ISSUE**: Multiple deployments show "Successful update operation" but error persists, suggesting either:
+     - Configuration changes not taking effect
+     - Caching issues in Cloud Functions
+     - Need to modify Stripe Dashboard settings directly
 
-##### **2. Project-Level Policy Conflicts**
-- Organization-level policies may be overriding IAM permissions
-- **Action Needed**: Check for organization constraints that could block service account access
+##### **Progress Made**:
+- ✅ **Stripe Customer Creation Working**: Webhook events show `customer.created` successfully
+- ✅ **Firebase Authentication Working**: User auth consistently passes
+- ✅ **Cloud Functions Deployment Working**: Functions deploy without Node version errors
+- ❌ **PaymentIntent Configuration Blocked**: Cannot proceed past payment authorization step
 
-##### **3. Firebase Admin SDK Version/Configuration**
-- Outdated firebase-functions package (warning shows during deploy)
-- **Action Needed**: Upgrade to latest firebase-functions version
+#### **Current Status - Stripe Configuration Blocked**
+- **Core Issue Resolved**: PERMISSION_DENIED completely eliminated 
+- **New Blocker**: Stripe PaymentIntent redirect configuration preventing payment authorization
+- **Evidence of Progress**: 
+  - Customers being created in Stripe (visible in webhook logs)
+  - No more Firestore permission errors
+  - Cloud Functions running successfully until Stripe PaymentIntent creation
 
-##### **4. Firestore Database Location/Region Mismatch**
-- Admin SDK may be connecting to wrong Firestore region
-- **Action Needed**: Verify Firestore database location matches Cloud Function region
+#### **Remaining Hypotheses for Stripe Issue**
 
-##### **5. API Enablement Issues**
-- Firestore API may not be properly enabled for the specific service account
-- **Action Needed**: Verify Cloud Firestore API is enabled and accessible
+##### **1. Stripe Dashboard Payment Method Configuration**
+- **Likely Root Cause**: Dashboard has redirect-based payment methods enabled globally
+- **Action Needed**: Go to Stripe Dashboard → Settings → Payment Methods and disable redirect-based methods
+- **Alternative**: Configure explicit `return_url` parameter in PaymentIntent
 
-#### **Immediate Action Plan**
-1. **Upgrade Firebase Functions Package**: `npm install --save firebase-functions@latest`
-2. **Add Service Account Debugging**: Log which service account is actually being used
-3. **Test Minimal Firestore Operation**: Create simplest possible read/write test
-4. **Check Organization Policies**: Look for any org-level constraints
-5. **Verify API Enablement**: Ensure all necessary APIs are enabled for both service accounts
+##### **2. Cloud Function Deployment Cache**
+- **Possible Issue**: Changes to PaymentIntent configuration not taking effect despite successful deployment
+- **Action Needed**: Try full functions redeployment or check for caching issues
 
-#### **Success Criteria**
-- ✅ Cloud Function can read from Firestore without permission errors
-- ✅ Cloud Function can write to Firestore collections (`customers`, `booking_requests`)
-- ✅ Stripe customer creation and payment intent creation work
-- ✅ End-to-end booking flow completes successfully
-- ✅ Admin dashboard shows created booking requests
+##### **3. Stripe API Version Compatibility**
+- **Possible Issue**: Using Stripe API version `2023-10-16` which may have different requirements
+- **Action Needed**: Upgrade to latest Stripe API version or adjust configuration
 
-#### **Lessons for Future Sessions**
-- Always verify exact service account being used in Cloud Functions
-- IAM policies can be complex with multiple service accounts involved
-- Environment variable encoding issues can cause subtle problems
-- Firestore permission debugging requires systematic elimination of variables
-- Service account permissions may take time to propagate
+##### **4. Payment Method Types Configuration**
+- **Current Approach**: Using `payment_method_types: ['card']` but may need different configuration
+- **Action Needed**: Test without `payment_method_types` or with different parameters
+
+#### **Recommended Next Steps**
+1. **Check Stripe Dashboard Settings**: 
+   - Go to Settings → Payment Methods
+   - Disable any redirect-based payment methods (BNPL, bank transfers, etc.)
+   - Keep only card payments enabled
+2. **Alternative: Add return_url Parameter**:
+   - Add `return_url: 'http://localhost:3000/booking/success'` to PaymentIntent
+3. **Test Different Stripe Configuration**:
+   - Remove `payment_method_types` parameter
+   - Try without `confirm: true` parameter
+4. **Upgrade Stripe API Version**:
+   - Update to latest Stripe API version in Cloud Function
+
+#### **Major Lessons Learned**
+
+##### **Critical Discovery: Node.js Version Issues**
+- **Most Important**: Node.js version compatibility can cause Firebase permission errors that appear to be IAM/service account issues
+- **Always Check**: When getting PERMISSION_DENIED errors, verify Node.js and Firebase CLI versions first
+- **Solution**: Keep Node.js ≥20.0.0 and reinstall Firebase CLI after Node upgrades
+
+##### **Debugging Methodology That Worked**
+- ✅ Systematic service account analysis led to correct discovery
+- ✅ IAM policy review revealed correct service accounts and roles
+- ✅ Environment variable troubleshooting (UTF-16 encoding issue)
+- ✅ Step-by-step permission elimination approach
+
+##### **What Didn't Help (But Were Logical Steps)**
+- ❌ Making Firestore rules ultra-permissive
+- ❌ Adding manual service account configurations  
+- ❌ Simplifying Cloud Function code to bypass Firestore reads
+- ❌ Multiple different Admin SDK initialization approaches
+
+##### **Stripe Integration Complexity**
+- Stripe configuration errors can be as blocking as permission issues
+- Dashboard settings impact API behavior significantly
+- PaymentIntent configuration requires careful parameter combination
+- Webhook setup needs local API endpoint (`POST /api/webhook 404` indicates missing endpoint)
+
+#### **Success Criteria Status**
+- ✅ **COMPLETED**: Cloud Function can read from Firestore without permission errors
+- ✅ **COMPLETED**: Cloud Function can write to Firestore collections 
+- ✅ **COMPLETED**: Stripe customer creation works
+- ❌ **BLOCKED**: Stripe payment intent creation (configuration issue)
+- ❌ **PENDING**: End-to-end booking flow completion
+- ❌ **PENDING**: Admin dashboard booking verification
+
+#### **For Future Development Sessions**
+- **Start Here**: The Node.js version fix was the breakthrough - this eliminated the core blocking issue
+- **Next Focus**: Stripe PaymentIntent configuration - either Dashboard settings or API parameters
+- **Tools Working**: Firebase Admin SDK, authentication, Firestore operations all functional
+- **Ready for Testing**: Once Stripe configuration resolved, full payment flow should work
+- **Documentation**: Update firebase-functions package (shows outdated warning on every deploy)
 
 ## Future Development Priorities
 1. **Complete Stripe Integration** - Resolve configuration issues and test payment flow
