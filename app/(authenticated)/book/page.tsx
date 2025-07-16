@@ -10,10 +10,11 @@ import { enUS } from 'date-fns/locale/en-US';
 import { db as firestore } from '@/lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, Timestamp, getDocs, doc as firestoreDoc, updateDoc, doc } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
-// Remove Stripe frontend imports - we'll use the hybrid approach instead
 import { httpsCallable } from 'firebase/functions';
 import { functions as firebaseFunctions, auth as firebaseAuth } from '@/lib/firebase';
 import { User } from 'firebase/auth';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { XCircleIcon } from '@heroicons/react/20/solid';
 import ServiceSelector from '@/components/ServiceSelector';
 
@@ -29,8 +30,8 @@ interface MyCalendarEvent extends BigCalendarEvent {
 const locales = { 'en-US': enUS };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
 
-// Initialize Stripe once outside of components
-// Removed Stripe Promise - using hybrid approach with Cloud Functions
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 const studioOpenTime = 9; // 9 AM
 const studioCloseTime = 2; // 2 AM (next day)
@@ -308,6 +309,9 @@ function BookingPaymentForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [showPaymentAuth, setShowPaymentAuth] = useState(false);
+  const stripe = useStripe();
+  const elements = useElements();
 
   const calculateTotalPrice = () => {
     if (!selectedServiceData) return 0;
@@ -372,8 +376,8 @@ function BookingPaymentForm({
         userId: user.uid,
         customerEmail: user.email,
         customerName: user.displayName || user.email,
-        startTime: selectedSlot.start,
-        endTime: selectedSlot.end,
+        startTime: selectedSlot!.start,
+        endTime: selectedSlot!.end,
         status: totalPrice === 0 ? 'pending_approval' : 'pending_payment',
         serviceType: selectedService,
         serviceName: selectedServiceData?.name || 'Unknown Service',
@@ -398,137 +402,58 @@ function BookingPaymentForm({
         ...(isNewCustomer && { isNewCustomer: true })
       };
 
-      // If the service is free, create booking and show confirmation
+      // If the service is free, create booking request directly
       if (totalPrice === 0) {
-        const bookingRef = await addDoc(collection(firestore, 'bookings'), newBookingData);
-        setBookingId(bookingRef.id);
-        clearSelectionStates();
-        setShowConfirm(true);
+        try {
+          // Test authentication first
+          const testAuthFunction = httpsCallable(firebaseFunctions, 'testAuth');
+          console.log('Testing authentication...');
+          const authTest = await testAuthFunction({});
+          console.log('Authentication test result:', authTest);
+          
+          console.log('User info:', {
+            uid: user?.uid,
+            email: user?.email,
+            displayName: user?.displayName
+          });
+          
+          console.log('Selected service data:', selectedServiceData);
+          
+          const submitBookingFunction = httpsCallable(firebaseFunctions, 'submitBookingRequestWithPaymentAuth');
+          const result = await submitBookingFunction({
+            resourceId: 'studio-1',
+            requestedStartTime: selectedSlot!.start.toISOString(),
+            requestedEndTime: selectedSlot!.end.toISOString(),
+            durationHours: (selectedSlot!.end.getTime() - selectedSlot!.start.getTime()) / (1000 * 60 * 60),
+            serviceType: selectedServiceData.serviceType || selectedServiceData.id || selectedServiceData.name,
+            serviceDetailsInput: {
+              producer: producer,
+              ...services,
+              notes: notes,
+              songCount: songCount,
+              selectedBeatLicense: selectedBeatLicense,
+              isNewCustomer: isNewCustomer
+            },
+            clientNotes: notes,
+            clientName: user?.displayName || user?.email || 'Unknown',
+            clientEmail: user?.email || '',
+            clientPhone: '',
+            paymentMethodId: null // No payment needed for free services
+          });
+
+          if ((result.data as any).success) {
+            clearSelectionStates();
+            setShowConfirm(true);
+          }
+        } catch (error: any) {
+          console.error('Error submitting free booking:', error);
+          setError(`Failed to submit booking: ${error.message}`);
+        }
         return;
       }
 
-      // Submit booking request using new hybrid approach
-      try {
-        console.log('Submitting booking request...');
-        console.log('User:', user);
-        console.log('User UID:', user?.uid);
-        
-        if (!user) {
-          throw new Error('User not authenticated');
-        }
-
-        // Ensure user has valid token and check auth instance
-        try {
-          const token = await user.getIdToken();
-          console.log('User token obtained:', !!token);
-          console.log('Current user in auth instance:', firebaseAuth.currentUser?.uid);
-          console.log('User from context:', user.uid);
-          
-          // Ensure auth instance has the current user
-          if (!firebaseAuth.currentUser || firebaseAuth.currentUser.uid !== user.uid) {
-            console.warn('Auth instance user mismatch, forcing refresh...');
-            await user.getIdToken(true); // Force refresh
-          }
-        } catch (tokenError) {
-          console.error('Error getting user token:', tokenError);
-          throw new Error('Unable to get authentication token');
-        }
-        
-        const submitBookingFunction = httpsCallable(firebaseFunctions, 'submitBookingRequest');
-        
-        console.log('Firebase Functions instance:', firebaseFunctions);
-        console.log('About to call function with data...');
-        
-        // Try calling function manually with fetch to debug
-        try {
-          console.log('Testing with manual fetch...');
-          const token = await user.getIdToken(true);
-          console.log('Token for manual call:', token.substring(0, 20) + '...');
-          
-          const response = await fetch('https://us-central1-sweetdreamsstudios-7c965.cloudfunctions.net/testAuth', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ data: {} })
-          });
-          
-          const result = await response.text();
-          console.log('Manual fetch response:', response.status, result);
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${result}`);
-          }
-        } catch (manualError) {
-          console.error('Manual fetch failed:', manualError);
-        }
-        
-        // Test authentication with httpsCallable
-        try {
-          console.log('Testing authentication with testAuth function...');
-          
-          // Force refresh token to ensure it's valid
-          const freshToken = await user.getIdToken(true);
-          console.log('Fresh token obtained:', !!freshToken);
-          
-          const testAuthFunction = httpsCallable(firebaseFunctions, 'testAuth');
-          const testResult = await testAuthFunction({});
-          console.log('testAuth result:', testResult.data);
-        } catch (testError) {
-          console.error('testAuth failed:', testError);
-          console.error('testError details:', testError);
-          throw new Error(`Authentication test failed: ${testError.message}`);
-        }
-        
-        const result = await submitBookingFunction({
-          resourceId: 'studio-1', // Default studio ID
-          requestedStartTime: selectedSlot.start.toISOString(),
-          requestedEndTime: selectedSlot.end.toISOString(),
-          durationHours: (selectedSlot.end.getTime() - selectedSlot.start.getTime()) / (1000 * 60 * 60),
-          serviceType: selectedServiceData.serviceType || selectedServiceData.id || selectedServiceData.name,
-          serviceDetailsInput: {
-            producer: producer,
-            ...services,
-            notes: notes,
-            songCount: songCount,
-            selectedBeatLicense: selectedBeatLicense,
-            isNewCustomer: isNewCustomer
-          },
-          clientNotes: notes,
-          clientName: user?.displayName || user?.email || 'Unknown',
-          clientEmail: user?.email || '',
-          clientPhone: '', // You might want to collect this in the form
-          returnUrl: `${window.location.origin}/booking-success`
-        });
-
-        console.log('Booking request submitted:', result.data);
-        
-        if (result.data.success && result.data.checkoutUrl) {
-          // Show payment summary before redirecting
-          const confirmed = confirm(`Booking Details:
-Total Cost: $${result.data.totalCost}
-Deposit Required: $${result.data.depositAmount}
-Remaining Balance: $${result.data.remainingBalance}
-
-You'll be redirected to pay the deposit. The remaining balance will be charged after your session.
-
-Continue to payment?`);
-          
-          if (confirmed) {
-            // Redirect to Stripe checkout for immediate payment
-            window.location.href = result.data.checkoutUrl;
-          } else {
-            // User cancelled, might want to delete the booking request
-            setError('Booking cancelled. Payment is required to reserve your session.');
-          }
-        } else {
-          throw new Error('Failed to create booking request');
-        }
-      } catch (error: any) {
-        console.error('Error submitting booking request:', error);
-        setError(`Failed to submit booking request: ${error.message}`);
-      }
+      // For paid services, show payment authorization form
+      setShowPaymentAuth(true);
     } catch (err) {
       console.error('Error creating booking:', err);
       setError('Failed to create booking. Please try again.');
@@ -540,7 +465,154 @@ Continue to payment?`);
   // Use selectedServiceData for display
   const totalPrice = calculateTotalPrice();
 
-  // Removed payment form - using hybrid approach with booking requests
+  const handlePaymentAuth = async () => {
+    if (!stripe || !elements || !user) {
+      setError('Payment system not ready. Please try again.');
+      return;
+    }
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      setError('Payment form not ready. Please try again.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Create payment method
+      const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+        billing_details: {
+          name: user.displayName || user.email || 'Unknown',
+          email: user.email || '',
+        },
+      });
+
+      if (pmError) {
+        setError(pmError.message || 'Payment method creation failed');
+        return;
+      }
+
+      // Test authentication first
+      const testAuthFunction = httpsCallable(firebaseFunctions, 'testAuth');
+      console.log('Testing authentication for paid service...');
+      const authTest = await testAuthFunction({});
+      console.log('Authentication test result:', authTest);
+      
+      console.log('User info:', {
+        uid: user?.uid,
+        email: user?.email,
+        displayName: user?.displayName
+      });
+      
+      console.log('Selected service data:', selectedServiceData);
+      
+      // Submit booking request with payment authorization
+      const submitBookingFunction = httpsCallable(firebaseFunctions, 'submitBookingRequestWithPaymentAuth');
+      const result = await submitBookingFunction({
+        resourceId: 'studio-1',
+        requestedStartTime: selectedSlot!.start.toISOString(),
+        requestedEndTime: selectedSlot!.end.toISOString(),
+        durationHours: (selectedSlot!.end.getTime() - selectedSlot!.start.getTime()) / (1000 * 60 * 60),
+        serviceType: selectedServiceData.serviceType || selectedServiceData.id || selectedServiceData.name,
+        serviceDetailsInput: {
+          producer: producer,
+          ...services,
+          notes: notes,
+          songCount: songCount,
+          selectedBeatLicense: selectedBeatLicense,
+          isNewCustomer: isNewCustomer
+        },
+        clientNotes: notes,
+        clientName: user?.displayName || user?.email || 'Unknown',
+        clientEmail: user?.email || '',
+        clientPhone: '',
+        paymentMethodId: paymentMethod.id
+      });
+
+      if ((result.data as any).success) {
+        if ((result.data as any).requiresAction && (result.data as any).clientSecret) {
+          // Handle 3D Secure authentication
+          const { error: confirmError } = await stripe.confirmCardPayment((result.data as any).clientSecret);
+          if (confirmError) {
+            setError(confirmError.message || '3D Secure authentication failed');
+            return;
+          }
+        }
+
+        // Success - payment authorized and booking request submitted
+        clearSelectionStates();
+        setShowConfirm(true);
+        setShowPaymentAuth(false);
+      } else {
+        throw new Error('Failed to submit booking request');
+      }
+    } catch (error: any) {
+      console.error('Error with payment authorization:', error);
+      setError(`Payment authorization failed: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (showPaymentAuth) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-4 rounded-lg border">
+          <h3 className="font-semibold text-lg mb-3">Payment Authorization</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            We'll authorize your card for the deposit amount. You won't be charged until an admin approves your booking.
+          </p>
+          <div className="mb-4 p-3 border rounded">
+            <CardElement 
+              options={{
+                style: {
+                  base: {
+                    fontSize: '16px',
+                    color: '#424770',
+                    '::placeholder': {
+                      color: '#aab7c4',
+                    },
+                  },
+                },
+              }}
+            />
+          </div>
+          <div className="flex space-x-3">
+            <button
+              type="button"
+              onClick={() => setShowPaymentAuth(false)}
+              className="flex-1 py-2 px-4 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handlePaymentAuth}
+              disabled={loading || !stripe || !elements}
+              className="flex-1 py-2 px-4 bg-accent-blue text-white rounded-md hover:bg-accent-blue/90 disabled:opacity-50"
+            >
+              {loading ? 'Authorizing...' : `Authorize $${Math.max(calculateTotalPrice() * 0.5, 25)}`}
+            </button>
+          </div>
+        </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <div className="flex">
+              <XCircleIcon className="h-5 w-5 text-red-400" />
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Error</h3>
+                <div className="mt-2 text-sm text-red-700">{error}</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleCreateBooking} className="space-y-6">
@@ -648,7 +720,7 @@ Continue to payment?`);
                 Processing...
               </div>
             ) : (
-              totalPrice === 0 ? '🎉 Book Free Session' : '💳 Proceed to Payment'
+              totalPrice === 0 ? '🎉 Book Free Session' : '💳 Authorize Payment'
             )}
           </button>
         </div>
@@ -1004,7 +1076,6 @@ export default function BookPage() {
               endAccessor="end"
                 style={{ height: '100%', width: '100%' }}
               selectable={true}
-              selectRangeFormat={() => ''}
               onSelectSlot={handleSelectSlot}
                 onSelectEvent={(event) => setSelectedBooking(event)}
               defaultView={Views.WEEK}
@@ -1055,24 +1126,26 @@ export default function BookPage() {
           <div className="lg:col-span-1">
           <div className="bg-slate-50/80 backdrop-blur-sm p-4 md:p-6 rounded-xl shadow-xl">
               <h2 className="text-2xl font-logo text-accent-blue mb-4">3. Confirm Booking</h2>
-              <BookingPaymentForm
-                selectedSlot={selectedSlot}
-                services={services}
-                notes={notes}
-                producer={producer}
-                clearSelectionStates={clearSelectionStates}
-                setShowConfirm={setShowConfirm}
-                setProducer={setProducer}
-                setServices={setServices}
-                setNotes={setNotes}
-                user={user}
-                selectedService={selectedService}
-                selectedServiceData={selectedServiceData}
-                selectedDuration={selectedDuration}
-                songCount={songCount}
-                selectedBeatLicense={selectedBeatLicense}
-                isNewCustomer={isNewCustomer}
-              />
+              <Elements stripe={stripePromise}>
+                <BookingPaymentForm
+                  selectedSlot={selectedSlot}
+                  services={services}
+                  notes={notes}
+                  producer={producer}
+                  clearSelectionStates={clearSelectionStates}
+                  setShowConfirm={setShowConfirm}
+                  setProducer={setProducer}
+                  setServices={setServices}
+                  setNotes={setNotes}
+                  user={user}
+                  selectedService={selectedService}
+                  selectedServiceData={selectedServiceData}
+                  selectedDuration={selectedDuration}
+                  songCount={songCount}
+                  selectedBeatLicense={selectedBeatLicense}
+                  isNewCustomer={isNewCustomer}
+                />
+              </Elements>
             </div>
           </div>
               )}
@@ -1089,10 +1162,22 @@ export default function BookPage() {
       {showConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Booking Submitted!</h2>
-            <p className="text-blue-600 mb-4">Your booking request has been submitted and is awaiting admin approval. You will be notified once it's confirmed.</p>
+            <h2 className="text-xl font-bold mb-4">Booking Request Submitted!</h2>
+            <p className="text-blue-600 mb-4">
+              Your booking request has been submitted successfully. 
+              {selectedServiceData?.isFree 
+                ? ' Since this is a free consultation, it will be reviewed and confirmed by our team.'
+                : ' Your payment has been authorized and will only be charged once an admin approves your booking.'
+              }
+            </p>
+            <p className="text-gray-600 text-sm mb-4">
+              You'll receive an email confirmation once your booking is approved.
+            </p>
             <button 
-              onClick={() => setShowConfirm(false)} 
+              onClick={() => {
+                setShowConfirm(false);
+                clearSelectionStates();
+              }} 
               className="w-full px-4 py-2 rounded bg-accent-green text-white hover:bg-accent-green/90"
             >
               Close

@@ -11,24 +11,37 @@ service cloud.firestore {
       allow read, write: if request.auth == null;
     }
 
-    // Bookings - SUPER SIMPLE - any authenticated user can do anything
+    // Bookings - users can read all, create for themselves
+    // Admins or Cloud Functions can modify existing bookings
     match /bookings/{bookingId} {
-      allow read, write: if request.auth != null;
-      // Allow Cloud Functions (Admin SDK) to read/write
+      // Read access for authenticated users
+      allow read: if request.auth != null;
+      // Users can create bookings for themselves
+      allow create: if request.auth != null && request.resource.data.clientId == request.auth.uid;
+      // Admin users can update or delete
+      allow update, delete: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // Allow Cloud Functions (Admin SDK) full access
       allow read, write: if request.auth == null;
     }
 
-    // Services - anyone can read/write if authenticated
+    // Services - readable by authenticated users
+    // Only admins or Cloud Functions may write
     match /services/{serviceId} {
-      allow read, write: if request.auth != null;
-      // Allow Cloud Functions (Admin SDK) to read/write
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // Allow Cloud Functions (Admin SDK) full access
       allow read, write: if request.auth == null;
     }
 
-    // Pricing Rules - anyone can read/write if authenticated + Cloud Functions admin access
+    // Pricing Rules - readable by authenticated users
+    // Only admins or Cloud Functions may write
     match /pricingRules/{ruleId} {
-      allow read, write: if request.auth != null;
-      // Allow admin SDK (Cloud Functions) to read/write
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // Allow admin SDK (Cloud Functions) full access
       allow read, write: if request.auth == null;
     }
 
@@ -39,14 +52,19 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == request.resource.data.clientId;
       // Allow admin SDK (Cloud Functions) to read/write/create
       allow read, write, create: if request.auth == null;
+      // TEMPORARY: Allow all authenticated users to create booking requests
+      allow create: if request.auth != null;
     }
 
-    // Stripe extension rules
+    // Custom Stripe customers collection (managed by Cloud Functions)
     match /customers/{uid} {
       allow read: if request.auth.uid == uid;
       // Allow Cloud Functions (Admin SDK) to read/write
       allow read, write: if request.auth == null;
+      // TEMPORARY: Allow authenticated users to read/write their own customer data
+      allow read, write: if request.auth != null && request.auth.uid == uid;
 
+      // Legacy Stripe extension subcollections (kept for backward compatibility)
       match /checkout_sessions/{id} {
         allow read, write: if request.auth.uid == uid;
         // Allow Cloud Functions (Admin SDK) to read/write
@@ -64,6 +82,16 @@ service cloud.firestore {
       }
     }
 
+    // Optional Stripe events collection for debugging/auditing
+    match /stripe_events/{eventId} {
+      // Only admins can read stripe events
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // Allow Cloud Functions (Admin SDK) to write events
+      allow write: if request.auth == null;
+    }
+
+    // Legacy Stripe extension product/price collections (kept for backward compatibility)
     match /products/{id} {
       allow read: if true;
       // Allow Cloud Functions (Admin SDK) to read/write
